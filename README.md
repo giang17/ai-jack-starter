@@ -65,9 +65,9 @@ For convenience, presets are still available:
 
 | Preset | Sample Rate | Buffer | Periods | Latency | Use Case |
 |--------|-------------|--------|---------|---------|----------|
-| 1 - Low | 48 kHz | 256 | 3 | ~5.3 ms | General audio work |
-| 2 - Medium | 48 kHz | 512 | 2 | ~10.7 ms | Stable, recommended |
-| 3 - Ultra-Low | 48 kHz | 128 | 3 | ~2.7 ms | Optimized systems only |
+| 1 - Low | 48 kHz | 128 | 2 | ~5.3 ms | General audio work |
+| 2 - Medium | 48 kHz | 256 | 2 | ~10.7 ms | Stable, recommended |
+| 3 - Ultra-Low | 48 kHz | 64 | 2 | ~2.7 ms | Optimized systems only |
 
 ```bash
 # Use preset (legacy syntax still works)

@@ -31,18 +31,18 @@ SYSTEM_CONFIG_FILE="$SYSTEM_CONFIG_DIR/jack-setting.conf"
 # Preset Definitions (for backward compatibility)
 # =============================================================================
 PRESET1_RATE=48000
-PRESET1_NPERIODS=3
-PRESET1_PERIOD=256
+PRESET1_NPERIODS=2
+PRESET1_PERIOD=128
 PRESET1_NAME="Low Latency"
 
 PRESET2_RATE=48000
 PRESET2_NPERIODS=2
-PRESET2_PERIOD=512
+PRESET2_PERIOD=256
 PRESET2_NAME="Medium Latency"
 
 PRESET3_RATE=48000
-PRESET3_NPERIODS=3
-PRESET3_PERIOD=128
+PRESET3_NPERIODS=2
+PRESET3_PERIOD=64
 PRESET3_NAME="Ultra-Low Latency"
 
 # =============================================================================

@@ -36,18 +36,18 @@ DEFAULT_NPERIODS=3
 # =============================================================================
 # Setting 1: Low Latency (Default)
 PRESET1_RATE=48000
-PRESET1_NPERIODS=3
-PRESET1_PERIOD=256
+PRESET1_NPERIODS=2
+PRESET1_PERIOD=128
 
 # Setting 2: Medium Latency
 PRESET2_RATE=48000
 PRESET2_NPERIODS=2
-PRESET2_PERIOD=512
+PRESET2_PERIOD=256
 
 # Setting 3: Ultra-Low Latency
 PRESET3_RATE=48000
-PRESET3_NPERIODS=3
-PRESET3_PERIOD=128
+PRESET3_NPERIODS=2
+PRESET3_PERIOD=64
 
 # =============================================================================
 # Configuration Files

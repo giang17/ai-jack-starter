@@ -43,21 +43,21 @@ class MotuM4JackGUI(Gtk.Window):
 
     # Presets (for quick selection)
     PRESETS = {
-        "low": {"name": "Low Latency", "rate": 48000, "period": 256, "nperiods": 3},
+        "low": {"name": "Low Latency", "rate": 48000, "period": 128, "nperiods": 2},
         "medium": {
             "name": "Medium Latency",
             "rate": 48000,
-            "period": 512,
+            "period": 256,
             "nperiods": 2,
         },
-        "ultra": {"name": "Ultra-Low", "rate": 48000, "period": 128, "nperiods": 3},
+        "ultra": {"name": "Ultra-Low", "rate": 48000, "period": 64, "nperiods": 2},
     }
 
     # Legacy preset mapping (for backward compatibility)
     LEGACY_PRESETS = {
-        1: {"rate": 48000, "period": 256, "nperiods": 3},
-        2: {"rate": 48000, "period": 512, "nperiods": 2},
-        3: {"rate": 48000, "period": 128, "nperiods": 3},
+        1: {"rate": 48000, "period": 128, "nperiods": 2},
+        2: {"rate": 48000, "period": 256, "nperiods": 2},
+        3: {"rate": 48000, "period": 64, "nperiods": 2},
     }
 
     # Icon path
@@ -210,19 +210,19 @@ class MotuM4JackGUI(Gtk.Window):
         self.preset_buttons = {}
 
         low_btn = Gtk.Button(label="Low (~5ms)")
-        low_btn.set_tooltip_text("48kHz, 256 frames, 3 periods")
+        low_btn.set_tooltip_text("48kHz, 128 frames, 2 periods")
         low_btn.connect("clicked", self.on_preset_clicked, "low")
         presets_box.pack_start(low_btn, True, True, 0)
         self.preset_buttons["low"] = low_btn
 
         medium_btn = Gtk.Button(label="Medium (~11ms)")
-        medium_btn.set_tooltip_text("48kHz, 512 frames, 2 periods")
+        medium_btn.set_tooltip_text("48kHz, 256 frames, 2 periods")
         medium_btn.connect("clicked", self.on_preset_clicked, "medium")
         presets_box.pack_start(medium_btn, True, True, 0)
         self.preset_buttons["medium"] = medium_btn
 
         ultra_btn = Gtk.Button(label="Ultra (~3ms)")
-        ultra_btn.set_tooltip_text("48kHz, 128 frames, 3 periods")
+        ultra_btn.set_tooltip_text("48kHz, 64 frames, 2 periods")
         ultra_btn.connect("clicked", self.on_preset_clicked, "ultra")
         presets_box.pack_start(ultra_btn, True, True, 0)
         self.preset_buttons["ultra"] = ultra_btn

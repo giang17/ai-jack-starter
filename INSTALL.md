@@ -207,9 +207,9 @@ For convenience, presets are still available (v1.x compatible):
 
 | Preset | Sample Rate | Buffer | Periods | Latency | Use Case |
 |--------|-------------|--------|---------|---------|----------|
-| 1 | 48,000 Hz | 256 | 3 | ~5.3 ms | General audio work |
-| 2 | 48,000 Hz | 512 | 2 | ~10.7 ms | Stable, recommended |
-| 3 | 48,000 Hz | 128 | 3 | ~2.7 ms | Optimized systems only |
+| 1 | 48,000 Hz | 128 | 2 | ~5.3 ms | General audio work |
+| 2 | 48,000 Hz | 256 | 2 | ~10.7 ms | Stable, recommended |
+| 3 | 48,000 Hz | 64 | 2 | ~2.7 ms | Optimized systems only |
 
 ```bash
 # Use preset
