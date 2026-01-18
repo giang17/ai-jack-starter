@@ -50,6 +50,8 @@ motu-m4-jack-gui.py
 
 Or find it in: **Audio/Video → MOTU M4 JACK Settings**
 
+![MOTU M4 JACK Settings GUI](gui.png)
+
 ## Documentation
 
 See [INSTALL.md](INSTALL.md) for:
