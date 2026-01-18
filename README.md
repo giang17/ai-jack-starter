@@ -21,26 +21,16 @@ Automatic JACK audio server management for the MOTU M4 USB audio interface. Star
 git clone https://github.com/giang17/motu-m4-jack-starter.git
 cd motu-m4-jack-starter
 
-# 2. Install scripts
-sudo cp motu-m4-*.sh /usr/local/bin/
-sudo chmod +x /usr/local/bin/motu-m4-*.sh
+# 2. Run the installer (installs everything)
+sudo ./install.sh
 
-# 3. Install UDEV rule
-sudo cp 99-motu-m4-jack-combined.rules /etc/udev/rules.d/
-sudo udevadm control --reload-rules
-
-# 4. Enable login check service
-mkdir -p ~/.config/systemd/user/
-cp motu-m4-login-check.service ~/.config/systemd/user/
-systemctl --user daemon-reload
-systemctl --user enable motu-m4-login-check.service
-
-# 5. Install GUI (optional)
-sudo ./install-gui.sh
-
-# 6. Configure JACK setting
+# 3. Configure JACK setting (optional - default is Setting 1)
 sudo motu-m4-jack-setting-system.sh 2 --restart
 ```
+
+The installer automatically sets up all scripts, UDEV rules, GUI, polkit rules, and systemd services.
+
+For manual installation, see [INSTALL.md](INSTALL.md).
 
 ## JACK Settings
 
