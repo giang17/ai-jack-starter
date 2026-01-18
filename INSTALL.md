@@ -50,22 +50,49 @@ sudo usermod -aG audio $USER
 
 ## Installation
 
-### Step 1: Clone Repository
+### Quick Installation (Recommended)
+
+The easiest way to install everything is using the automated installer:
+
+```bash
+# Clone repository
+git clone https://github.com/giang17/motu-m4-jack-starter.git
+cd motu-m4-jack-starter
+
+# Run installer
+sudo ./install.sh
+```
+
+The installer automatically:
+- Checks dependencies
+- Installs all scripts to `/usr/local/bin/`
+- Installs the GUI with desktop entry and icon
+- Configures UDEV rules
+- Sets up Polkit for passwordless operation
+- Enables the systemd user service
+- Verifies audio group membership
+
+### Manual Installation
+
+If you prefer manual installation or need more control:
+
+#### Step 1: Clone Repository
 
 ```bash
 git clone https://github.com/giang17/motu-m4-jack-starter.git
 cd motu-m4-jack-starter
 ```
 
-### Step 2: Install Scripts
+#### Step 2: Install Scripts
 
 ```bash
 sudo cp motu-m4-*.sh /usr/local/bin/
 sudo chmod +x /usr/local/bin/motu-m4-*.sh
-sudo cp debug-config.sh /usr/local/bin/
+sudo cp debug-config.sh detect-display.sh /usr/local/bin/
+sudo chmod +x /usr/local/bin/debug-config.sh /usr/local/bin/detect-display.sh
 ```
 
-### Step 3: Install UDEV Rule
+#### Step 3: Install UDEV Rule
 
 ```bash
 sudo cp 99-motu-m4-jack-combined.rules /etc/udev/rules.d/
@@ -73,7 +100,7 @@ sudo udevadm control --reload-rules
 sudo udevadm trigger
 ```
 
-### Step 4: Enable Login Check Service
+#### Step 4: Enable Login Check Service
 
 ```bash
 mkdir -p ~/.config/systemd/user/
@@ -82,13 +109,9 @@ systemctl --user daemon-reload
 systemctl --user enable motu-m4-login-check.service
 ```
 
-### Step 5: Install GUI (Optional)
+#### Step 5: Install GUI (Optional)
 
 ```bash
-# Automatic installation (recommended)
-sudo ./install-gui.sh
-
-# Or manually:
 sudo cp motu-m4-jack-gui.py /usr/local/bin/
 sudo chmod +x /usr/local/bin/motu-m4-jack-gui.py
 sudo cp motu-m4-jack-settings.desktop /usr/share/applications/
@@ -97,7 +120,7 @@ sudo cp motu-m4-jack-settings.svg /usr/share/icons/hicolor/scalable/apps/
 sudo gtk-update-icon-cache /usr/share/icons/hicolor/
 ```
 
-### Step 6: Install Polkit Rule (Passwordless Operation)
+#### Step 6: Install Polkit Rule (Passwordless Operation)
 
 ```bash
 sudo cp 50-motu-m4-jack-settings.rules /etc/polkit-1/rules.d/
