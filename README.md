@@ -1,183 +1,182 @@
+# MOTU M4 JACK Automation System for Ubuntu Studio
 
-# MOTU M4 JACK Automatisierungssystem für Ubuntu Studio
+## Overview
 
-## Übersicht
+This system provides full automation of the JACK audio server for the MOTU M4 audio interface on Ubuntu Studio. It automatically starts and stops JACK based on hardware detection and user login status.
 
-Dieses System bietet eine vollständige Automatisierung des JACK Audio-Servers für das MOTU M4 Audio-Interface unter Ubuntu Studio. Es startet und stoppt JACK automatisch basierend auf der Hardware-Erkennung und dem Benutzer-Login-Status.
-
-## System-Spezifikationen
+## System Specifications
 
 - **OS**: Ubuntu 24.04 (Ubuntu Studio Audio Config)
-- **Kernel**: 6.11.0-1022-oem (Dell OEM-Kernel)
-- **Audio-Stack**: Pipewire mit JACK-Kompatibilität
+- **Kernel**: 6.11.0-1022-oem (Dell OEM Kernel)
+- **Audio Stack**: Pipewire with JACK compatibility
 - **Hardware**: MOTU M4 USB Audio Interface
-- **Performance**: 10,2ms Latenz, DSP < 4%, keine XRuns
+- **Performance**: 10.2ms latency, DSP < 4%, no XRuns
 
-### Kernel-Optimierungen
+### Kernel Optimizations
 ```bash
-# Boot-Parameter
+# Boot parameters
 preempt=full threadirqs isolcpus=14-19 nohz_full=14-19 rcu_nocbs=14-19
 ```
 
-- **CPU-Isolation**: Kerne 14-19 für Audio reserviert
-- **IRQ-Threading**: Verbesserte Interrupt-Behandlung
-- **No-Hz/RCU**: Reduzierte Timer-Interrupts auf isolierten Kernen
+- **CPU Isolation**: Cores 14-19 reserved for audio
+- **IRQ Threading**: Improved interrupt handling
+- **No-Hz/RCU**: Reduced timer interrupts on isolated cores
 
-## Systemkomponenten
+## System Components
 
-### 1. UDEV-Regel (`99-motu-m4-jack-combined.rules`)
-- Erkennt automatisch das Anschließen/Trennen der MOTU M4
-- Ruft entsprechende Handler-Skripte auf
-- Erstellt Trigger-Dateien für Boot-Szenarien
+### 1. UDEV Rule (`99-motu-m4-jack-combined.rules`)
+- Automatically detects MOTU M4 connection/disconnection
+- Calls appropriate handler scripts
+- Creates trigger files for boot scenarios
 
-### 2. UDEV-Handler (`motu-m4-udev-handler.sh`)
-- Läuft als root über UDEV
-- Prüft Benutzer-Login-Status
-- Verwaltet JACK-Start/-Stop für Hot-Plug-Szenarien
+### 2. UDEV Handler (`motu-m4-udev-handler.sh`)
+- Runs as root via UDEV
+- Checks user login status
+- Manages JACK start/stop for hot-plug scenarios
 
-### 3. JACK-Autostart-Skripte
-- **`motu-m4-jack-autostart.sh`**: Für root-Kontext (UDEV)
-- **`motu-m4-jack-autostart-user.sh`**: Für user-Kontext (systemd)
-- **`motu-m4-jack-init.sh`**: Eigentlicher JACK-Start mit Parametern
-- **`motu-m4-jack-shutdown.sh`**: Sauberes JACK-Shutdown
+### 3. JACK Autostart Scripts
+- **`motu-m4-jack-autostart.sh`**: For root context (UDEV)
+- **`motu-m4-jack-autostart-user.sh`**: For user context (systemd)
+- **`motu-m4-jack-init.sh`**: Actual JACK startup with parameters
+- **`motu-m4-jack-shutdown.sh`**: Clean JACK shutdown
 
-### 4. Login-Check-Service (`motu-m4-login-check.service`)
-- Systemd user-service
-- Prüft nach Login auf bereits angeschlossene M4
-- Startet JACK für Boot-Szenarien
+### 4. Login Check Service (`motu-m4-login-check.service`)
+- Systemd user service
+- Checks for already connected M4 after login
+- Starts JACK for boot scenarios
 
-### 5. Setting-Helper (`motu-m4-jack-setting.sh`)
-- Einfache Auswahl zwischen JACK-Konfigurationen
-- Persistente Speicherung in ~/.config/motu-m4/jack-setting.conf
-- Übersichtliche Anzeige der verfügbaren Settings
+### 5. Setting Helper (`motu-m4-jack-setting.sh`)
+- Simple selection between JACK configurations
+- Persistent storage in ~/.config/motu-m4/jack-setting.conf
+- Clear display of available settings
 
-### 6. System-Setting-Helper (`motu-m4-jack-setting-system.sh`)
-- Systemweite JACK-Konfiguration (erfordert sudo)
-- Konfiguration für alle Benutzer
-- Robuste Lösung für UDEV/root-Kontexte
+### 6. System Setting Helper (`motu-m4-jack-setting-system.sh`)
+- System-wide JACK configuration (requires sudo)
+- Configuration for all users
+- Robust solution for UDEV/root contexts
 
 ### 7. GUI (`motu-m4-jack-gui.py`)
-- Minimalistische GTK3-Oberfläche
-- Anzeige von JACK-Status und Hardware-Verbindung
-- Auswahl zwischen den 3 JACK-Settings
-- Automatischer Restart mit pkexec für Administratorrechte
+- Minimalistic GTK3 interface
+- Display of JACK status and hardware connection
+- Selection between 3 JACK settings
+- Automatic restart with pkexec for administrator privileges
 
-## JACK-Konfiguration
+## JACK Configuration
 
-Das System unterstützt drei vorkonfigurierte JACK-Parameter-Sets:
+The system supports three preconfigured JACK parameter sets:
 
-### Setting 1: Niedrige Latenz (Standard)
+### Setting 1: Low Latency (Default)
 ```bash
 Device: hw:M4,0
 Sample Rate: 48000 Hz
 Periods: 3
 Period Size: 256 frames
-Latenz: ~5.3 ms
+Latency: ~5.3 ms
 Backend: ALSA
 MIDI: ALSA-JACK Bridge (a2j)
 ```
 
-### Setting 2: Mittlere Latenz
+### Setting 2: Medium Latency
 ```bash
 Device: hw:M4,0
 Sample Rate: 48000 Hz
 Periods: 2
 Period Size: 512 frames
-Latenz: ~10.7 ms
+Latency: ~10.7 ms
 Backend: ALSA
 MIDI: ALSA-JACK Bridge (a2j)
 ```
 
-### Setting 3: Ultra-niedrige Latenz
+### Setting 3: Ultra-Low Latency
 ```bash
 Device: hw:M4,0
 Sample Rate: 96000 Hz
 Periods: 3
 Period Size: 128 frames
-Latenz: ~1.3 ms
+Latency: ~1.3 ms
 Backend: ALSA
 MIDI: ALSA-JACK Bridge (a2j)
 ```
 
-### Setting-Auswahl
+### Setting Selection
 
-Das System verwendet eine **Prioritätshierarchie** für die Konfiguration:
+The system uses a **priority hierarchy** for configuration:
 
-1. **Umgebungsvariable** `JACK_SETTING` (höchste Priorität)
-2. **User-Konfiguration** `~/.config/motu-m4/jack-setting.conf`
-3. **Systemweite Konfiguration** `/etc/motu-m4/jack-setting.conf`
-4. **Standard-Setting** (Setting 1)
+1. **Environment variable** `JACK_SETTING` (highest priority)
+2. **User configuration** `~/.config/motu-m4/jack-setting.conf`
+3. **System-wide configuration** `/etc/motu-m4/jack-setting.conf`
+4. **Default setting** (Setting 1)
 
 ```bash
-# Über Umgebungsvariable (temporär)
-export JACK_SETTING=1  # Standard (niedrige Latenz)
-export JACK_SETTING=2  # Mittlere Latenz
-export JACK_SETTING=3  # Ultra-niedrige Latenz
+# Via environment variable (temporary)
+export JACK_SETTING=1  # Default (low latency)
+export JACK_SETTING=2  # Medium latency
+export JACK_SETTING=3  # Ultra-low latency
 
-# Mit User-Hilfsskript (persistent)
-./motu-m4-jack-setting.sh 1  # Setting 1 aktivieren
-./motu-m4-jack-setting.sh 2  # Setting 2 aktivieren (Mittlere Latenz)
-./motu-m4-jack-setting.sh 3  # Setting 3 aktivieren
+# With user helper script (persistent)
+./motu-m4-jack-setting.sh 1  # Activate Setting 1
+./motu-m4-jack-setting.sh 2  # Activate Setting 2 (Medium latency)
+./motu-m4-jack-setting.sh 3  # Activate Setting 3
 
-# Mit System-Hilfsskript (systemweit, erfordert sudo - EMPFOHLEN)
-sudo ./motu-m4-jack-setting-system.sh 1 --restart  # Niedrige Latenz (~5.3ms)
-sudo ./motu-m4-jack-setting-system.sh 2 --restart  # Mittlere Latenz (~10.7ms)
-sudo ./motu-m4-jack-setting-system.sh 3 --restart  # Ultra-niedrige Latenz (~1.3ms)
+# With system helper script (system-wide, requires sudo - RECOMMENDED)
+sudo ./motu-m4-jack-setting-system.sh 1 --restart  # Low latency (~5.3ms)
+sudo ./motu-m4-jack-setting-system.sh 2 --restart  # Medium latency (~10.7ms)
+sudo ./motu-m4-jack-setting-system.sh 3 --restart  # Ultra-low latency (~1.3ms)
 ```
 
-### Warum diese Hierarchie?
-- **UDEV-Handler** (root-Kontext) kann User's `.bashrc` nicht lesen
-- **Systemd-Services** haben eingeschränkte Umgebungsvariablen
-- **Konfigurationsdateien** funktionieren in allen Kontexten
-- **Flexibilität** für verschiedene Anwendungsfälle
+### Why This Hierarchy?
+- **UDEV handler** (root context) cannot read user's `.bashrc`
+- **Systemd services** have limited environment variables
+- **Configuration files** work in all contexts
+- **Flexibility** for different use cases
 
-### Automatisches Restart
-Beide Setting-Skripte unterstützen automatisches JACK-Restart mit `--restart`:
-- **Prüft** ob MOTU M4 verfügbar ist
-- **Erkennt** ob JACK läuft (Restart vs. Start)
-- **Wendet** neue Einstellungen sofort an
-- **Robuste** Fehlerbehandlung
+### Automatic Restart
+Both setting scripts support automatic JACK restart with `--restart`:
+- **Checks** if MOTU M4 is available
+- **Detects** if JACK is running (restart vs. start)
+- **Applies** new settings immediately
+- **Robust** error handling
 
-## Unterstützte Szenarien
+## Supported Scenarios
 
-| Szenario | Verhalten | Komponente |
-|----------|-----------|------------|
-| **Boot mit M4 an** | Trigger-Datei → JACK nach Login | UDEV + Login-Check |
-| **M4 nach Login anschließen** | JACK startet sofort | UDEV-Handler |
-| **M4 trennen** | JACK stoppt sauber | UDEV-Handler |
-| **Multi-Monitor** | Flexible Display-Erkennung | Alle Komponenten |
+| Scenario | Behavior | Component |
+|----------|----------|-----------|
+| **Boot with M4 connected** | Trigger file → JACK after login | UDEV + Login-Check |
+| **Connect M4 after login** | JACK starts immediately | UDEV Handler |
+| **Disconnect M4** | JACK stops cleanly | UDEV Handler |
+| **Multi-monitor** | Flexible display detection | All components |
 
 ## Installation
 
-### 1. Skripte installieren
+### 1. Install Scripts
 ```bash
 sudo cp motu-m4-*.sh /usr/local/bin/
 sudo chmod +x /usr/local/bin/motu-m4-*.sh
 ```
 
-### 1a. GUI installieren (optional)
+### 1a. Install GUI (optional)
 ```bash
-# Automatische Installation
+# Automatic installation
 sudo ./install-gui.sh
 
-# Oder manuell:
+# Or manually:
 sudo cp motu-m4-jack-gui.py /usr/local/bin/
 sudo chmod +x /usr/local/bin/motu-m4-jack-gui.py
 sudo cp motu-m4-jack-settings.desktop /usr/share/applications/
 ```
 
-**Abhängigkeiten für GUI:**
+**GUI Dependencies:**
 ```bash
 sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-3.0
 ```
 
-### 2. UDEV-Regel installieren
+### 2. Install UDEV Rule
 ```bash
 sudo cp 99-motu-m4-jack-combined.rules /etc/udev/rules.d/
 sudo udevadm control --reload-rules
 ```
 
-### 3. Systemd User-Service aktivieren
+### 3. Enable Systemd User Service
 ```bash
 mkdir -p ~/.config/systemd/user/
 cp motu-m4-login-check.service ~/.config/systemd/user/
@@ -185,234 +184,234 @@ systemctl --user daemon-reload
 systemctl --user enable motu-m4-login-check.service
 ```
 
-### 4. JACK-Setting konfigurieren
+### 4. Configure JACK Setting
 
-#### Systemweite Konfiguration (EMPFOHLEN für Produktionseinsatz)
+#### System-wide Configuration (RECOMMENDED for production use)
 ```bash
-# Einmal systemweit konfigurieren - funktioniert für alle Szenarien
-sudo ./motu-m4-jack-setting-system.sh 2 --restart  # Höhere Latenz (empfohlen)
+# Configure system-wide once - works for all scenarios
+sudo ./motu-m4-jack-setting-system.sh 2 --restart  # Medium latency (recommended)
 
-# Alle verfügbaren Settings:
-sudo ./motu-m4-jack-setting-system.sh 1 --restart  # Niedrige Latenz (48kHz, 3x256, ~5.3ms)
-sudo ./motu-m4-jack-setting-system.sh 2 --restart  # Mittlere Latenz (48kHz, 2x512, ~10.7ms)  
-sudo ./motu-m4-jack-setting-system.sh 3 --restart  # Ultra-niedrige Latenz (96kHz, 3x128, ~1.3ms)
+# All available settings:
+sudo ./motu-m4-jack-setting-system.sh 1 --restart  # Low latency (48kHz, 3x256, ~5.3ms)
+sudo ./motu-m4-jack-setting-system.sh 2 --restart  # Medium latency (48kHz, 2x512, ~10.7ms)  
+sudo ./motu-m4-jack-setting-system.sh 3 --restart  # Ultra-low latency (96kHz, 3x128, ~1.3ms)
 
-# Status prüfen
+# Check status
 sudo ./motu-m4-jack-setting-system.sh current
-jack_settings.sh  # Aktuelle JACK-Parameter anzeigen
+jack_settings.sh  # Display current JACK parameters
 ```
 
-#### User-spezifische Konfiguration (optional)
+#### User-specific Configuration (optional)
 ```bash
-# Nur verwenden wenn User-spezifische Settings gewünscht
+# Only use if user-specific settings are desired
 ./motu-m4-jack-setting.sh 2 --restart
 
-# Verfügbare Settings anzeigen
+# Show available settings
 ./motu-m4-jack-setting.sh show
 
-# WICHTIG: User-Config überschreibt System-Config!
-# Zum Entfernen: rm ~/.config/motu-m4/jack-setting.conf
+# IMPORTANT: User config overrides system config!
+# To remove: rm ~/.config/motu-m4/jack-setting.conf
 ```
 
-#### Schnellstart (Empfohlene Konfiguration)
+#### Quick Start (Recommended Configuration)
 ```bash
-# Für die meisten Anwendungsfälle perfekt:
+# Perfect for most use cases:
 sudo ./motu-m4-jack-setting-system.sh 2 --restart
 ```
 
-## Dateien im System
+## Files in the System
 
 ```
 /usr/local/bin/
-├── motu-m4-udev-handler.sh          # UDEV-Handler (root)
-├── motu-m4-jack-autostart.sh        # Autostart für UDEV-Kontext
-├── motu-m4-jack-autostart-user.sh   # Autostart für User-Kontext
-├── motu-m4-jack-init.sh             # JACK-Initialisierung
-├── motu-m4-jack-shutdown.sh         # JACK-Shutdown
-├── motu-m4-jack-restart-simple.sh   # JACK-Restart
-├── motu-m4-jack-setting.sh          # User-Setting-Helper
-├── motu-m4-jack-setting-system.sh   # System-Setting-Helper
+├── motu-m4-udev-handler.sh          # UDEV handler (root)
+├── motu-m4-jack-autostart.sh        # Autostart for UDEV context
+├── motu-m4-jack-autostart-user.sh   # Autostart for user context
+├── motu-m4-jack-init.sh             # JACK initialization
+├── motu-m4-jack-shutdown.sh         # JACK shutdown
+├── motu-m4-jack-restart-simple.sh   # JACK restart
+├── motu-m4-jack-setting.sh          # User setting helper
+├── motu-m4-jack-setting-system.sh   # System setting helper
 ├── motu-m4-jack-gui.py              # GTK3 GUI
-└── debug-config.sh                  # Konfiguration-Debug-Tool
+└── debug-config.sh                  # Configuration debug tool
 
 /usr/share/applications/
-└── motu-m4-jack-settings.desktop    # Desktop-Eintrag für GUI
+└── motu-m4-jack-settings.desktop    # Desktop entry for GUI
 
 /etc/udev/rules.d/
-└── 99-motu-m4-jack-combined.rules   # Hardware-Erkennungsregeln
+└── 99-motu-m4-jack-combined.rules   # Hardware detection rules
 
 ~/.config/systemd/user/
-└── motu-m4-login-check.service      # Login-Check-Service
+└── motu-m4-login-check.service      # Login check service
 
-~/.config/motu-m4/                    # User-Konfiguration
-└── jack-setting.conf                # User-JACK-Setting
+~/.config/motu-m4/                    # User configuration
+└── jack-setting.conf                # User JACK setting
 
-/etc/motu-m4/                         # System-Konfiguration
-└── jack-setting.conf                # System-JACK-Setting
+/etc/motu-m4/                         # System configuration
+└── jack-setting.conf                # System JACK setting
 
-/run/motu-m4/                         # Runtime-Logs
+/run/motu-m4/                         # Runtime logs
 ├── jack-autostart.log
 ├── jack-autostart-user.log
 ├── jack-login-check.log
 ├── jack-uvdev-handler.log
 ├── jack-init.log
-└── m4-detected                      # Trigger-Datei
+└── m4-detected                      # Trigger file
 ```
 
-## Gelöste technische Herausforderungen
+## Solved Technical Challenges
 
-### 1. Display-Erkennung
-**Problem**: Dual-Monitor-Setup änderte Display von `:0` zu `:1`
-**Lösung**: Flexible Erkennung mit `grep "(:"`
+### 1. Display Detection
+**Problem**: Dual-monitor setup changed display from `:0` to `:1`
+**Solution**: Flexible detection with `grep "(:"`
 
-### 2. Benutzerrechte
-**Problem**: `runuser` funktioniert nur als root
-**Lösung**: Separate Skripte für verschiedene Ausführungskontexte
+### 2. User Permissions
+**Problem**: `runuser` only works as root
+**Solution**: Separate scripts for different execution contexts
 
-### 3. Timing-Probleme
-**Problem**: DBUS-Socket nicht verfügbar bei frühem Start
-**Lösung**: Warteschleifen und Login-Erkennung
+### 3. Timing Issues
+**Problem**: DBUS socket not available on early start
+**Solution**: Wait loops and login detection
 
-### 4. Log-Berechtigungen
-**Problem**: Konfliktende Schreibrechte zwischen root und user
-**Lösung**: Getrennte Log-Dateien in `/run/motu-m4/`
+### 4. Log Permissions
+**Problem**: Conflicting write permissions between root and user
+**Solution**: Separate log files in `/run/motu-m4/`
 
-### 5. Konfiguration in verschiedenen Kontexten
-**Problem**: UDEV (root) kann User's `.bashrc` nicht lesen
-**Lösung**: Hierarchische Konfiguration über Dateien mit Fallback-Mechanismus
+### 5. Configuration in Different Contexts
+**Problem**: UDEV (root) cannot read user's `.bashrc`
+**Solution**: Hierarchical configuration via files with fallback mechanism
 
-### 6. User-Config vs. System-Config Konflikte
-**Problem**: User-Konfiguration überschreibt systemweite Settings unbemerkt
-**Lösung**: Debug-Tools und klare Empfehlung für systemweite Konfiguration
+### 6. User-Config vs. System-Config Conflicts
+**Problem**: User configuration overrides system-wide settings unnoticed
+**Solution**: Debug tools and clear recommendation for system-wide configuration
 
 ## Debugging
 
-### Log-Dateien prüfen
+### Check Log Files
 ```bash
-# Alle Logs anzeigen
+# Show all logs
 ls -la /run/motu-m4/
 
-# UDEV-Handler-Aktivität
+# UDEV handler activity
 cat /run/motu-m4/jack-uvdev-handler.log
 
-# Login-Check-Aktivität
+# Login check activity
 cat /run/motu-m4/jack-login-check.log
 
-# JACK-Start-Details
+# JACK start details
 cat /run/motu-m4/jack-autostart-user.log
 ```
 
-### JACK-Status prüfen
+### Check JACK Status
 ```bash
 jack_control status
-jack_control dp  # Parameter anzeigen
-jack_settings.sh  # Übersichtliche Parameter-Anzeige
+jack_control dp  # Show parameters
+jack_settings.sh  # Clear parameter display
 ```
 
-### Konfiguration debuggen
+### Debug Configuration
 ```bash
-# Vollständige Konfigurationsanalyse:
+# Full configuration analysis:
 bash debug-config.sh
 
-# Zeigt Prioritätsauflösung und aktuelle Parameter
+# Shows priority resolution and current parameters
 ```
 
-### Services prüfen
+### Check Services
 ```bash
 systemctl --user status motu-m4-login-check.service
 ```
 
-## Erweiterte Konfiguration
+## Advanced Configuration
 
-### IRQ-Affinität (optional)
+### IRQ Affinity (optional)
 ```bash
-# set_irq_affinity.sh für optimale IRQ-Verteilung
-# Automatisch über systemd-service ausführbar
+# set_irq_affinity.sh for optimal IRQ distribution
+# Can be run automatically via systemd service
 ```
 
-### Alternative Audio-Interfaces
-- Skripte können für andere USB-Audio-Interfaces angepasst werden
-- `aplay -l | grep "INTERFACE_NAME"` in den Skripten ändern
-- JACK-Parameter in `motu-m4-jack-init.sh` anpassen
-- Neue Settings über die Variablen am Anfang des Scripts definieren
+### Alternative Audio Interfaces
+- Scripts can be adapted for other USB audio interfaces
+- Change `aplay -l | grep "INTERFACE_NAME"` in the scripts
+- Adjust JACK parameters in `motu-m4-jack-init.sh`
+- Define new settings via variables at the beginning of the script
 
-### JACK-Parameter anpassen
+### Customize JACK Parameters
 ```bash
-# In motu-m4-jack-init.sh neue Settings hinzufügen:
+# Add new settings in motu-m4-jack-init.sh:
 SETTING4_RATE=192000
 SETTING4_NPERIODS=2
 SETTING4_PERIOD=64
-SETTING4_DESC="Extreme Latenz (192kHz, 2x64)"
+SETTING4_DESC="Extreme Latency (192kHz, 2x64)"
 ```
 
-### Konfigurationspriorität verstehen
-Die **Prioritätshierarchie** macht das System robust für verschiedene Szenarien:
+### Understanding Configuration Priority
+The **priority hierarchy** makes the system robust for different scenarios:
 
-- **Entwicklung/Testing**: Umgebungsvariable für temporäre Änderungen
-- **Normaler Betrieb**: User-Konfiguration für persönliche Einstellungen
-- **System-Administration**: Systemweite Konfiguration für alle Benutzer
-- **Fallback**: Standard-Setting als sichere Basis
+- **Development/Testing**: Environment variable for temporary changes
+- **Normal Operation**: User configuration for personal settings
+- **System Administration**: System-wide configuration for all users
+- **Fallback**: Default setting as a safe base
 
-### Automatisches Restart verwenden
+### Using Automatic Restart
 ```bash
-# Empfohlene Verwendung (sofortige Anwendung):
+# Recommended usage (immediate application):
 sudo ./motu-m4-jack-setting-system.sh 2 --restart
 
-# Ohne automatisches Restart (manuell später):
+# Without automatic restart (manually later):
 sudo ./motu-m4-jack-setting-system.sh 2
 sudo ./motu-m4-jack-restart-simple.sh
 ```
 
-### Produktions-Empfehlungen
+### Production Recommendations
 ```bash
-# Optimale Konfiguration für die meisten Setups:
+# Optimal configuration for most setups:
 sudo ./motu-m4-jack-setting-system.sh 2 --restart
 
-# User-Konfigurationen vermeiden:
-rm ~/.config/motu-m4/jack-setting.conf  # Falls vorhanden
+# Avoid user configurations:
+rm ~/.config/motu-m4/jack-setting.conf  # If present
 
-# Status regelmäßig prüfen:
+# Check status regularly:
 bash debug-config.sh
 ```
 
-### GUI verwenden
+### Using the GUI
 ```bash
-# GUI starten
+# Start GUI
 motu-m4-jack-gui.py
 
-# Oder über Anwendungsmenü:
+# Or via application menu:
 # Audio/Video → MOTU M4 JACK Settings
 ```
 
-Die GUI bietet:
-- **Status-Anzeige**: JACK-Server-Status und Hardware-Verbindung
-- **Setting-Auswahl**: Alle 3 Latenz-Profile mit Details
-- **Automatischer Restart**: Optional nach Änderung
-- **Administratorrechte**: Via pkexec (Passwort-Abfrage)
+The GUI offers:
+- **Status Display**: JACK server status and hardware connection
+- **Setting Selection**: All 3 latency profiles with details
+- **Automatic Restart**: Optional after changes
+- **Administrator Privileges**: Via pkexec (password prompt)
 
-## Kompatibilität
+## Compatibility
 
 - **Ubuntu Studio 24.04+**
-- **Pipewire-basierte Audio-Stacks**
+- **Pipewire-based audio stacks**
 - **JACK2 via D-Bus**
-- **USB-Audio-Interfaces mit ALSA-Unterstützung**
-- **Multi-Monitor-Setups**
+- **USB audio interfaces with ALSA support**
+- **Multi-monitor setups**
 
 ---
 
-## Lizenz
+## License
 
-Dieses Projekt steht unter der **GNU General Public License v3.0** (GPL-3.0).
+This project is licensed under the **GNU General Public License v3.0** (GPL-3.0).
 
-Sie können diese Software frei verwenden, modifizieren und weitergeben, solange Sie:
-- Die Lizenz beibehalten
-- Den Quellcode verfügbar machen
-- Änderungen dokumentieren
+You may freely use, modify, and distribute this software, provided you:
+- Retain the license
+- Make the source code available
+- Document changes
 
-Siehe [LICENSE](LICENSE) für den vollständigen Lizenztext.
+See [LICENSE](LICENSE) for the full license text.
 
 ---
 
-**Entwickelt und getestet**: Januar 2026  
-**Lizenz**: GPL-3.0-or-later  
-**Status**: Produktionsreif ✅
+**Developed and tested**: January 2026  
+**License**: GPL-3.0-or-later  
+**Status**: Production Ready ✅
