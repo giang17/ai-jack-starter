@@ -90,9 +90,7 @@ motu-m4-jack-gui.py
 
 Or find it in: **Audio/Video → MOTU M4 JACK Settings**
 
-<p align="center">
-  <img src="gui.png" alt="MOTU M4 JACK Settings GUI" width="450">
-</p>
+<img src="gui.png" alt="MOTU M4 JACK Settings GUI" width="432">
 
 ### GUI Features
 
