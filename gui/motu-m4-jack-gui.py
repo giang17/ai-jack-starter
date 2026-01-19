@@ -11,6 +11,7 @@ Features:
 - Adjustable periods (2-8)
 - Live latency calculation
 - Quick presets for common configurations
+- Automatic system theme integration (KDE/GNOME/etc.)
 
 Copyright (C) 2025
 License: GPL-3.0-or-later
@@ -74,6 +75,9 @@ class MotuM4JackGUI(Gtk.Window):
 
         # Flag to prevent recursive updates
         self.updating_ui = False
+
+        # Get theme colors
+        self._init_theme_colors()
 
         # Set icon
         if os.path.exists(self.ICON_PATH):
@@ -186,14 +190,14 @@ class MotuM4JackGUI(Gtk.Window):
 
         self.latency_label = Gtk.Label()
         self.latency_label.set_markup(
-            "<span size='large' foreground='#2e7d32'>~5.3 ms</span>"
+            f"<span size='large' foreground='{self.color_success}'>~5.3 ms</span>"
         )
         latency_box.pack_start(self.latency_label, False, False, 0)
 
         # Latency warning
         self.latency_warning = Gtk.Label()
         self.latency_warning.set_markup(
-            "<span foreground='#ff6f00' size='small'>⚠ Very low latency may cause audio glitches</span>"
+            f"<span foreground='{self.color_warning}' size='small'>⚠ Very low latency may cause audio glitches</span>"
         )
         self.latency_warning.set_no_show_all(True)
         config_box.pack_start(self.latency_warning, False, False, 0)
@@ -278,6 +282,56 @@ class MotuM4JackGUI(Gtk.Window):
         self.spinner.hide()
         self.latency_warning.hide()
 
+    def _init_theme_colors(self):
+        """Initialize colors from system theme or use sensible defaults"""
+        # Try to get colors from GTK theme
+        style_context = Gtk.StyleContext()
+
+        # Create a temporary widget to get theme colors
+        temp_widget = Gtk.Label()
+        style_context = temp_widget.get_style_context()
+
+        # Default colors (GNOME/Adwaita-like, work well on most themes)
+        self.color_success = "#26a269"  # Green
+        self.color_error = "#c01c28"  # Red
+        self.color_warning = "#e5a50a"  # Orange/Yellow
+        self.color_accent = "#3584e4"  # Blue
+
+        # Try to detect dark theme and adjust colors for better visibility
+        settings = Gtk.Settings.get_default()
+        if settings:
+            prefer_dark = settings.get_property("gtk-application-prefer-dark-theme")
+            theme_name = settings.get_property("gtk-theme-name") or ""
+
+            # Check if using a dark theme
+            is_dark = prefer_dark or "dark" in theme_name.lower()
+
+            if is_dark:
+                # Brighter colors for dark themes
+                self.color_success = "#33d17a"  # Brighter green
+                self.color_error = "#f66151"  # Brighter red
+                self.color_warning = "#f8e45c"  # Brighter yellow
+                self.color_accent = "#62a0ea"  # Brighter blue
+
+        # Try to get actual theme colors via CSS lookup
+        try:
+            # For GNOME/GTK themes that define these
+            rgba_success = Gdk.RGBA()
+            rgba_error = Gdk.RGBA()
+
+            if style_context.lookup_color("success_color", rgba_success)[0]:
+                self.color_success = self._rgba_to_hex(rgba_success)
+            if style_context.lookup_color("error_color", rgba_error)[0]:
+                self.color_error = self._rgba_to_hex(rgba_error)
+        except Exception:
+            pass  # Use defaults
+
+    def _rgba_to_hex(self, rgba):
+        """Convert Gdk.RGBA to hex color string"""
+        return "#{:02x}{:02x}{:02x}".format(
+            int(rgba.red * 255), int(rgba.green * 255), int(rgba.blue * 255)
+        )
+
     def on_destroy(self, widget):
         """Handler for window close - stop timer and quit"""
         self.stop_status_timer()
@@ -333,18 +387,18 @@ class MotuM4JackGUI(Gtk.Window):
         """Updates the latency display"""
         latency = self.calculate_latency()
 
-        # Color based on latency
+        # Color based on latency (using theme-aware colors)
         if latency < 3:
-            color = "#d32f2f"  # Red - very low
+            color = self.color_error  # Red - very low
             self.latency_warning.show()
         elif latency < 5:
-            color = "#ff6f00"  # Orange - low
+            color = self.color_warning  # Orange - low
             self.latency_warning.hide()
         elif latency < 10:
-            color = "#2e7d32"  # Green - good
+            color = self.color_success  # Green - good
             self.latency_warning.hide()
         else:
-            color = "#1565c0"  # Blue - safe
+            color = self.color_accent  # Blue - safe
             self.latency_warning.hide()
 
         self.latency_label.set_markup(
@@ -383,22 +437,22 @@ class MotuM4JackGUI(Gtk.Window):
         jack_running = self.check_jack_status()
         if jack_running:
             self.jack_status_label.set_markup(
-                "JACK Server: <span foreground='#2e7d32'><b>● Running</b></span>"
+                f"JACK Server: <span foreground='{self.color_success}'><b>● Running</b></span>"
             )
         else:
             self.jack_status_label.set_markup(
-                "JACK Server: <span foreground='#d32f2f'><b>○ Stopped</b></span>"
+                f"JACK Server: <span foreground='{self.color_error}'><b>○ Stopped</b></span>"
             )
 
         # Hardware Status
         hardware_found = self.check_hardware()
         if hardware_found:
             self.hardware_status_label.set_markup(
-                "MOTU M4: <span foreground='#2e7d32'><b>● Connected</b></span>"
+                f"MOTU M4: <span foreground='{self.color_success}'><b>● Connected</b></span>"
             )
         else:
             self.hardware_status_label.set_markup(
-                "MOTU M4: <span foreground='#d32f2f'><b>○ Not found</b></span>"
+                f"MOTU M4: <span foreground='{self.color_error}'><b>○ Not found</b></span>"
             )
 
         # Current config display
@@ -581,19 +635,13 @@ class MotuM4JackGUI(Gtk.Window):
 
 def main():
     """Main entry point"""
-    # CSS for better appearance
+    # Minimal CSS - let system theme handle most styling
+    # This respects KDE/GNOME/XFCE themes automatically
     css_provider = Gtk.CssProvider()
     css = b"""
-    window {
-        background-color: #f5f5f5;
-    }
+    /* Minimal styling - respect system theme */
     frame {
-        background-color: white;
         border-radius: 5px;
-    }
-    .suggested-action {
-        background-color: #3584e4;
-        color: white;
     }
     spinbutton {
         min-width: 80px;
