@@ -42,8 +42,9 @@ class MotuM4JackGUI(Gtk.Window):
     MIN_PERIODS = 2
     MAX_PERIODS = 8
 
-    # Presets (for quick selection)
+    # Presets (for quick selection) - ordered by latency: Ultra → Low → Medium
     PRESETS = {
+        "ultra": {"name": "Ultra-Low", "rate": 48000, "period": 64, "nperiods": 2},
         "low": {"name": "Low Latency", "rate": 48000, "period": 128, "nperiods": 2},
         "medium": {
             "name": "Medium Latency",
@@ -51,7 +52,6 @@ class MotuM4JackGUI(Gtk.Window):
             "period": 256,
             "nperiods": 2,
         },
-        "ultra": {"name": "Ultra-Low", "rate": 48000, "period": 64, "nperiods": 2},
     }
 
     # Legacy preset mapping (for backward compatibility)
@@ -180,16 +180,17 @@ class MotuM4JackGUI(Gtk.Window):
         config_box.pack_start(separator, False, False, 5)
 
         # Latency display
-        latency_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        latency_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
         latency_box.set_halign(Gtk.Align.CENTER)
         config_box.pack_start(latency_box, False, False, 0)
 
         latency_title = Gtk.Label()
-        latency_title.set_markup("<b>Calculated Latency:</b>")
+        latency_title.set_markup("<b>Buffer Latency / Round-Trip Latency:</b>")
         latency_box.pack_start(latency_title, False, False, 0)
 
         self.latency_label = Gtk.Label()
         self.latency_label.set_markup(
+            f"<span size='large' foreground='{self.color_success}'>~2.7 ms</span>  /  "
             f"<span size='large' foreground='{self.color_success}'>~5.3 ms</span>"
         )
         latency_box.pack_start(self.latency_label, False, False, 0)
@@ -210,26 +211,19 @@ class MotuM4JackGUI(Gtk.Window):
         presets_frame.add(presets_box)
         main_box.pack_start(presets_frame, False, False, 0)
 
-        # Preset buttons
+        # Preset buttons (dynamically generated from PRESETS)
         self.preset_buttons = {}
 
-        low_btn = Gtk.Button(label="Low (~5ms)")
-        low_btn.set_tooltip_text("48kHz, 128 frames, 2 periods")
-        low_btn.connect("clicked", self.on_preset_clicked, "low")
-        presets_box.pack_start(low_btn, True, True, 0)
-        self.preset_buttons["low"] = low_btn
-
-        medium_btn = Gtk.Button(label="Medium (~11ms)")
-        medium_btn.set_tooltip_text("48kHz, 256 frames, 2 periods")
-        medium_btn.connect("clicked", self.on_preset_clicked, "medium")
-        presets_box.pack_start(medium_btn, True, True, 0)
-        self.preset_buttons["medium"] = medium_btn
-
-        ultra_btn = Gtk.Button(label="Ultra (~3ms)")
-        ultra_btn.set_tooltip_text("48kHz, 64 frames, 2 periods")
-        ultra_btn.connect("clicked", self.on_preset_clicked, "ultra")
-        presets_box.pack_start(ultra_btn, True, True, 0)
-        self.preset_buttons["ultra"] = ultra_btn
+        for preset_key, preset_data in self.PRESETS.items():
+            _, roundtrip = self._calculate_preset_latency(preset_data)
+            btn = Gtk.Button(label=f"{preset_data['name']} (~{roundtrip}ms)")
+            btn.set_tooltip_text(
+                f"{preset_data['rate']}Hz, {preset_data['period']} frames, "
+                f"{preset_data['nperiods']} periods"
+            )
+            btn.connect("clicked", self.on_preset_clicked, preset_key)
+            presets_box.pack_start(btn, True, True, 0)
+            self.preset_buttons[preset_key] = btn
 
         # Checkbox for automatic restart
         self.restart_check = Gtk.CheckButton(
@@ -371,8 +365,17 @@ class MotuM4JackGUI(Gtk.Window):
         """Returns the selected number of periods"""
         return int(self.periods_spin.get_value())
 
+    def _calculate_preset_latency(self, preset):
+        """Calculate latency for a preset dict - used during __init__"""
+        rate = preset["rate"]
+        period = preset["period"]
+        nperiods = preset["nperiods"]
+        buffer_latency = period / rate * 1000
+        roundtrip_latency = (period * nperiods) / rate * 1000
+        return round(buffer_latency, 1), round(roundtrip_latency, 1)
+
     def calculate_latency(self, rate=None, buffer=None, periods=None):
-        """Calculates latency in milliseconds"""
+        """Calculates latency in milliseconds - returns (buffer_latency, roundtrip_latency)"""
         if rate is None:
             rate = self.get_selected_rate()
         if buffer is None:
@@ -380,21 +383,22 @@ class MotuM4JackGUI(Gtk.Window):
         if periods is None:
             periods = self.get_selected_periods()
 
-        latency = (buffer * periods) / rate * 1000
-        return round(latency, 1)
+        buffer_latency = buffer / rate * 1000
+        roundtrip_latency = (buffer * periods) / rate * 1000
+        return round(buffer_latency, 1), round(roundtrip_latency, 1)
 
     def update_latency_display(self):
         """Updates the latency display"""
-        latency = self.calculate_latency()
+        buffer_latency, roundtrip_latency = self.calculate_latency()
 
-        # Color based on latency (using theme-aware colors)
-        if latency < 3:
+        # Color based on roundtrip latency (using theme-aware colors)
+        if roundtrip_latency < 3:
             color = self.color_error  # Red - very low
             self.latency_warning.show()
-        elif latency < 5:
+        elif roundtrip_latency < 5:
             color = self.color_warning  # Orange - low
             self.latency_warning.hide()
-        elif latency < 10:
+        elif roundtrip_latency < 10:
             color = self.color_success  # Green - good
             self.latency_warning.hide()
         else:
@@ -402,7 +406,8 @@ class MotuM4JackGUI(Gtk.Window):
             self.latency_warning.hide()
 
         self.latency_label.set_markup(
-            f"<span size='large' foreground='{color}'><b>~{latency} ms</b></span>"
+            f"<span size='large' foreground='{color}'><b>~{buffer_latency} ms</b></span>  /  "
+            f"<span size='large' foreground='{color}'><b>~{roundtrip_latency} ms</b></span>"
         )
 
     def on_config_changed(self, widget):
@@ -460,11 +465,15 @@ class MotuM4JackGUI(Gtk.Window):
         rate = config.get("rate", 48000)
         period = config.get("period", 256)
         nperiods = config.get("nperiods", 3)
-        latency = self.calculate_latency(rate, period, nperiods)
+        buffer_latency, roundtrip_latency = self.calculate_latency(
+            rate, period, nperiods
+        )
 
         self.current_config_label.set_markup(
             f"Active: <b>{rate:,} Hz</b> | <b>{period}</b> frames | "
-            f"<b>{nperiods}</b> periods | <b>~{latency} ms</b>".replace(",", ".")
+            f"<b>{nperiods}</b> periods | <b>~{roundtrip_latency} ms</b>".replace(
+                ",", "."
+            )
         )
 
     def read_current_config(self):
