@@ -576,12 +576,13 @@ class MotuM4JackGUI(Gtk.Window):
         self.updating_ui = False
 
     def check_a2j_status(self):
-        """Checks if a2jmidid is running"""
+        """Checks if a2jmidid bridge is actually active"""
         try:
             result = subprocess.run(
                 ["a2j_control", "--status"], capture_output=True, text=True, timeout=5
             )
-            return "bridge is running" in result.stdout.lower()
+            # Check for "Bridging enabled" (not "bridge is running")
+            return "bridging enabled" in result.stdout.lower()
         except Exception:
             return False
 
