@@ -595,6 +595,9 @@ class MotuM4JackGUI(Gtk.Window):
             result = subprocess.run(
                 ["jack_control", "status"], capture_output=True, text=True, timeout=5
             )
+            # Check for DBus errors (can happen at early boot)
+            if "dbus" in result.stderr.lower() or "autolaunch" in result.stderr.lower():
+                return False
             return "started" in result.stdout.lower()
         except Exception:
             return False

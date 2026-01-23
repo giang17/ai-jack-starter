@@ -334,6 +334,26 @@ jack_control status || fail "JACK server is not running correctly"
 # A2J MIDI Bridge (Optional)
 # =============================================================================
 
+# Helper function to safely call a2j_control (handles DBus errors at early boot)
+safe_a2j_control() {
+    local cmd="$1"
+    local result
+    result=$(a2j_control "$cmd" 2>&1)
+    local exit_code=$?
+
+    # Check for DBus errors
+    if echo "$result" | grep -qi "dbus\|autolaunch"; then
+        log "WARNING: a2j_control $cmd failed - DBus not available"
+        echo "Note: a2j_control $cmd unavailable (DBus not ready)"
+        return 1
+    fi
+
+    if [ $exit_code -ne 0 ]; then
+        log "WARNING: a2j_control $cmd returned $exit_code: $result"
+    fi
+    return $exit_code
+}
+
 # Helper function to safely check a2j status (handles DBus errors at early boot)
 check_a2j_bridge_active() {
     local status
@@ -371,10 +391,10 @@ if [ "$A2J_SHOULD_START" = true ]; then
         log "A2J MIDI Bridge is already active."
     else
         # Enable hardware export (allows ALSA apps to still access hardware)
-        a2j_control --ehw || echo "Hardware export possibly already enabled"
+        safe_a2j_control --ehw || echo "Hardware export possibly already enabled"
 
         # Start A2J bridge
-        a2j_control --start || echo "A2J MIDI Bridge could not be started, possibly already active"
+        safe_a2j_control --start || echo "A2J MIDI Bridge could not be started, possibly already active"
 
         # Check and log Real-Time priority for a2j
         sleep 1  # Brief wait for a2j process to start
@@ -398,7 +418,10 @@ else
     if check_a2j_bridge_active || pgrep -x "a2jmidid" > /dev/null 2>&1; then
         echo "Stopping existing A2J MIDI Bridge..."
         log "Stopping A2J MIDI Bridge as it's disabled in config"
-        a2j_control --stop || echo "Could not stop A2J"
+        if ! safe_a2j_control --stop; then
+            # Fallback: use killall if a2j_control fails
+            killall a2jmidid 2>/dev/null || true
+        fi
     fi
 fi
 
