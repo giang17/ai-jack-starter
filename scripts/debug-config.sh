@@ -31,9 +31,9 @@ USER_CONFIG_FILE="$HOME/.config/motu-m4/jack-setting.conf"
 if [ -f "$USER_CONFIG_FILE" ]; then
     echo -e "${GREEN}   Vorhanden: $USER_CONFIG_FILE${NC}"
     echo -e "${GREEN}   Inhalt:${NC}"
-    cat "$USER_CONFIG_FILE" | while read line; do
+    while read -r line; do
         echo "      $line"
-    done
+    done < "$USER_CONFIG_FILE"
     USER_SETTING=$(grep "^JACK_SETTING=" "$USER_CONFIG_FILE" | cut -d'=' -f2 | tr -d ' ')
     if [ -n "$USER_SETTING" ]; then
         echo -e "${GREEN}   Wert: JACK_SETTING=$USER_SETTING${NC}"
@@ -51,9 +51,9 @@ SYSTEM_CONFIG_FILE="/etc/motu-m4/jack-setting.conf"
 if [ -f "$SYSTEM_CONFIG_FILE" ]; then
     echo -e "${GREEN}   Vorhanden: $SYSTEM_CONFIG_FILE${NC}"
     echo -e "${GREEN}   Inhalt:${NC}"
-    cat "$SYSTEM_CONFIG_FILE" | while read line; do
+    while read -r line; do
         echo "      $line"
-    done
+    done < "$SYSTEM_CONFIG_FILE"
     SYSTEM_SETTING=$(grep "^JACK_SETTING=" "$SYSTEM_CONFIG_FILE" | cut -d'=' -f2 | tr -d ' ')
     if [ -n "$SYSTEM_SETTING" ]; then
         echo -e "${GREEN}   Wert: JACK_SETTING=$SYSTEM_SETTING${NC}"
@@ -72,7 +72,8 @@ echo -e "${BLUE}4. Prioritätsauflösung (wie im motu-m4-jack-init.sh):${NC}"
 read_config_file() {
     local config_file="$1"
     if [ -f "$config_file" ]; then
-        local setting=$(grep "^JACK_SETTING=" "$config_file" | cut -d'=' -f2 | tr -d ' ')
+        local setting
+        setting=$(grep "^JACK_SETTING=" "$config_file" | cut -d'=' -f2 | tr -d ' ')
         if [ -n "$setting" ]; then
             echo "$setting"
             return 0

@@ -94,7 +94,8 @@ read_config_value() {
     local config_file="$1"
     local key="$2"
     if [ -f "$config_file" ]; then
-        local value=$(grep "^${key}=" "$config_file" | cut -d'=' -f2 | tr -d ' ')
+        local value
+        value=$(grep "^${key}=" "$config_file" | cut -d'=' -f2 | tr -d ' ')
         if [ -n "$value" ]; then
             echo "$value"
             return 0
@@ -160,10 +161,14 @@ load_config_from_file() {
 
     # Check for v2.0 format first
     if is_v2_config "$config_file"; then
-        local rate=$(read_config_value "$config_file" "JACK_RATE")
-        local period=$(read_config_value "$config_file" "JACK_PERIOD")
-        local nperiods=$(read_config_value "$config_file" "JACK_NPERIODS")
-        local a2j_enable=$(read_config_value "$config_file" "A2J_ENABLE")
+        local rate
+        local period
+        local nperiods
+        local a2j_enable
+        rate=$(read_config_value "$config_file" "JACK_RATE")
+        period=$(read_config_value "$config_file" "JACK_PERIOD")
+        nperiods=$(read_config_value "$config_file" "JACK_NPERIODS")
+        a2j_enable=$(read_config_value "$config_file" "A2J_ENABLE")
 
         if [ -n "$rate" ]; then
             ACTIVE_RATE="$rate"
@@ -184,7 +189,8 @@ load_config_from_file() {
 
     # Fallback to legacy v1.x format
     if is_legacy_config "$config_file"; then
-        local setting=$(read_config_value "$config_file" "JACK_SETTING")
+        local setting
+        setting=$(read_config_value "$config_file" "JACK_SETTING")
         if [ -n "$setting" ]; then
             apply_legacy_preset "$setting"
             log "Loaded legacy v1.x config from $config_file: Setting=$setting (Rate=$ACTIVE_RATE, Period=$ACTIVE_PERIOD, Nperiods=$ACTIVE_NPERIODS)"
@@ -278,12 +284,14 @@ ACTIVE_DESC="Custom (${ACTIVE_RATE}Hz, ${ACTIVE_NPERIODS}x${ACTIVE_PERIOD}, ~${L
 # Debug Logging
 # =============================================================================
 log_config_debug() {
-    echo "$(date): CONFIG DEBUG - ACTUAL_USER: ${ACTUAL_USER:-unset}" >> $LOG
-    echo "$(date): CONFIG DEBUG - USER_CONFIG_FILE: $USER_CONFIG_FILE" >> $LOG
-    echo "$(date): CONFIG DEBUG - SYSTEM_CONFIG_FILE: $SYSTEM_CONFIG_FILE" >> $LOG
-    echo "$(date): CONFIG DEBUG - Config source: $config_source" >> $LOG
-    echo "$(date): CONFIG DEBUG - Final config: Rate=$ACTIVE_RATE, Period=$ACTIVE_PERIOD, Nperiods=$ACTIVE_NPERIODS, A2J=$ACTIVE_A2J_ENABLE" >> $LOG
-    echo "$(date): CONFIG DEBUG - Calculated latency: ${LATENCY_MS}ms" >> $LOG
+    {
+        echo "$(date): CONFIG DEBUG - ACTUAL_USER: ${ACTUAL_USER:-unset}"
+        echo "$(date): CONFIG DEBUG - USER_CONFIG_FILE: $USER_CONFIG_FILE"
+        echo "$(date): CONFIG DEBUG - SYSTEM_CONFIG_FILE: $SYSTEM_CONFIG_FILE"
+        echo "$(date): CONFIG DEBUG - Config source: $config_source"
+        echo "$(date): CONFIG DEBUG - Final config: Rate=$ACTIVE_RATE, Period=$ACTIVE_PERIOD, Nperiods=$ACTIVE_NPERIODS, A2J=$ACTIVE_A2J_ENABLE"
+        echo "$(date): CONFIG DEBUG - Calculated latency: ${LATENCY_MS}ms"
+    } >> $LOG
 }
 
 # Log debug information
@@ -318,9 +326,9 @@ log "Configuring JACK: Rate=$ACTIVE_RATE, Periods=$ACTIVE_NPERIODS, Period=$ACTI
 
 jack_control ds alsa
 jack_control dps device hw:M4,0
-jack_control dps rate $ACTIVE_RATE
-jack_control dps nperiods $ACTIVE_NPERIODS
-jack_control dps period $ACTIVE_PERIOD
+jack_control dps rate "$ACTIVE_RATE"
+jack_control dps nperiods "$ACTIVE_NPERIODS"
+jack_control dps period "$ACTIVE_PERIOD"
 
 # Start JACK
 echo "Starting JACK server with new parameters..."
@@ -400,7 +408,7 @@ if [ "$A2J_SHOULD_START" = true ]; then
         sleep 1  # Brief wait for a2j process to start
         a2j_pid=$(pgrep a2j)
         if [ -n "$a2j_pid" ]; then
-            rt_class=$(ps -o cls= -p $a2j_pid 2>/dev/null | tr -d ' ')
+            rt_class=$(ps -o cls= -p "$a2j_pid" 2>/dev/null | tr -d ' ')
             if [ "$rt_class" = "FF" ]; then
                 echo "A2J is running with Real-Time priority"
                 log "A2J running with Real-Time priority (PID: $a2j_pid)"

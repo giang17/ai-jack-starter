@@ -65,7 +65,7 @@ log "Rufe Init-Script auf: $INIT_SCRIPT (absoluter Pfad)"
 echo "Verwende absoluten Pfad: $INIT_SCRIPT"
 
 # Init-Script als erkannter Benutzer ausführen mit korrekten Umgebungsvariablen
-runuser -l $USER -c "
+runuser -l "$USER" -c "
 export DISPLAY=:1
 export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$USER_ID/bus
 export XDG_RUNTIME_DIR=/run/user/$USER_ID

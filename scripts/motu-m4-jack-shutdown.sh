@@ -29,7 +29,7 @@ fi
 
 if [ -z "$ACTIVE_USER" ]; then
     log "WARNING: No active user detected - trying to continue anyway"
-    USER="$USER"
+    USER="${USER:-root}"
 else
     USER="$ACTIVE_USER"
 fi
@@ -43,7 +43,7 @@ export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$USER_ID/bus
 export XDG_RUNTIME_DIR=/run/user/$USER_ID
 
 # Stop JACK and A2J cleanly
-runuser -l $USER -c "
+runuser -l "$USER" -c "
 # First stop A2J MIDI Bridge cleanly (if running)
 if a2j_control --status 2>/dev/null | grep -q 'bridge is running'; then
     echo 'Stopping A2J MIDI Bridge cleanly...'

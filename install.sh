@@ -228,7 +228,8 @@ install_systemd_service() {
     echo ""
     echo -e "${YELLOW}Installing systemd user service...${NC}"
 
-    local actual_user=$(get_actual_user)
+    local actual_user
+    actual_user=$(get_actual_user)
 
     if [ -z "$actual_user" ]; then
         echo -e "  ${YELLOW}⚠${NC} Could not determine user - skipping systemd service"
@@ -236,7 +237,8 @@ install_systemd_service() {
         return
     fi
 
-    local user_home=$(eval echo ~$actual_user)
+    local user_home
+    user_home=$(eval echo ~"$actual_user")
     local service_dir="$user_home/.config/systemd/user"
 
     if [ -f "$SCRIPT_DIR/system/motu-m4-login-check.service" ]; then
@@ -263,7 +265,8 @@ check_audio_group() {
     echo ""
     echo -e "${YELLOW}Checking audio group membership...${NC}"
 
-    local actual_user=$(get_actual_user)
+    local actual_user
+    actual_user=$(get_actual_user)
 
     if [ -z "$actual_user" ]; then
         echo -e "  ${YELLOW}⚠${NC} Could not determine user"

@@ -59,7 +59,7 @@ VALID_PERIODS="16 32 64 128 256 512 1024 2048 4096"
 check_root() {
     if [ "$EUID" -ne 0 ]; then
         echo -e "${RED}Error:${NC} This script requires root privileges."
-        echo "Please run with sudo: sudo $0 $@"
+        echo "Please run with sudo: sudo $0"
         exit 1
     fi
 }
@@ -112,25 +112,28 @@ show_presets() {
     echo -e "${BLUE}Available Presets (v1.x compatible):${NC}"
     echo ""
 
-    local latency1=$(calc_latency $PRESET1_RATE $PRESET1_PERIOD $PRESET1_NPERIODS)
+    local latency1
+    latency1=$(calc_latency "$PRESET1_RATE" "$PRESET1_PERIOD" "$PRESET1_NPERIODS")
     echo -e "${GREEN}Preset 1:${NC} $PRESET1_NAME"
-    echo "  - Sample Rate: $(printf "%'d" $PRESET1_RATE) Hz"
+    echo "  - Sample Rate: $(printf "%'d" "$PRESET1_RATE") Hz"
     echo "  - Buffer Size: $PRESET1_PERIOD frames"
     echo "  - Periods: $PRESET1_NPERIODS"
     echo "  - Latency: ~${latency1} ms"
     echo ""
 
-    local latency2=$(calc_latency $PRESET2_RATE $PRESET2_PERIOD $PRESET2_NPERIODS)
+    local latency2
+    latency2=$(calc_latency "$PRESET2_RATE" "$PRESET2_PERIOD" "$PRESET2_NPERIODS")
     echo -e "${GREEN}Preset 2:${NC} $PRESET2_NAME"
-    echo "  - Sample Rate: $(printf "%'d" $PRESET2_RATE) Hz"
+    echo "  - Sample Rate: $(printf "%'d" "$PRESET2_RATE") Hz"
     echo "  - Buffer Size: $PRESET2_PERIOD frames"
     echo "  - Periods: $PRESET2_NPERIODS"
     echo "  - Latency: ~${latency2} ms"
     echo ""
 
-    local latency3=$(calc_latency $PRESET3_RATE $PRESET3_PERIOD $PRESET3_NPERIODS)
+    local latency3
+    latency3=$(calc_latency "$PRESET3_RATE" "$PRESET3_PERIOD" "$PRESET3_NPERIODS")
     echo -e "${GREEN}Preset 3:${NC} $PRESET3_NAME"
-    echo "  - Sample Rate: $(printf "%'d" $PRESET3_RATE) Hz"
+    echo "  - Sample Rate: $(printf "%'d" "$PRESET3_RATE") Hz"
     echo "  - Buffer Size: $PRESET3_PERIOD frames"
     echo "  - Periods: $PRESET3_NPERIODS"
     echo "  - Latency: ~${latency3} ms"
@@ -159,10 +162,14 @@ show_current() {
 
     if [ -f "$SYSTEM_CONFIG_FILE" ]; then
         # Check for v2.0 format
-        local rate=$(grep "^JACK_RATE=" "$SYSTEM_CONFIG_FILE" 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
-        local period=$(grep "^JACK_PERIOD=" "$SYSTEM_CONFIG_FILE" 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
-        local nperiods=$(grep "^JACK_NPERIODS=" "$SYSTEM_CONFIG_FILE" 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
-        local a2j_enable=$(grep "^A2J_ENABLE=" "$SYSTEM_CONFIG_FILE" 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
+        local rate
+        local period
+        local nperiods
+        local a2j_enable
+        rate=$(grep "^JACK_RATE=" "$SYSTEM_CONFIG_FILE" 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
+        period=$(grep "^JACK_PERIOD=" "$SYSTEM_CONFIG_FILE" 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
+        nperiods=$(grep "^JACK_NPERIODS=" "$SYSTEM_CONFIG_FILE" 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
+        a2j_enable=$(grep "^A2J_ENABLE=" "$SYSTEM_CONFIG_FILE" 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
 
         if [ -n "$rate" ] || [ -n "$period" ] || [ -n "$nperiods" ]; then
             # v2.0 format
@@ -171,11 +178,12 @@ show_current() {
             nperiods=${nperiods:-3}
             a2j_enable=${a2j_enable:-false}
 
-            local latency=$(calc_latency $rate $period $nperiods)
+            local latency
+            latency=$(calc_latency "$rate" "$period" "$nperiods")
 
             echo -e "${GREEN}Configuration Format:${NC} v2.0 (flexible)"
             echo ""
-            echo -e "${CYAN}Sample Rate:${NC}  $(printf "%'d" $rate) Hz"
+            echo -e "${CYAN}Sample Rate:${NC}  $(printf "%'d" "$rate") Hz"
             echo -e "${CYAN}Buffer Size:${NC}  $period frames"
             echo -e "${CYAN}Periods:${NC}      $nperiods"
             echo -e "${CYAN}Latency:${NC}      ~${latency} ms"
@@ -184,7 +192,8 @@ show_current() {
             echo -e "${BLUE}Config File:${NC} $SYSTEM_CONFIG_FILE"
         else
             # Check for legacy v1.x format
-            local setting=$(grep "^JACK_SETTING=" "$SYSTEM_CONFIG_FILE" 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
+            local setting
+            setting=$(grep "^JACK_SETTING=" "$SYSTEM_CONFIG_FILE" 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
 
             if [ -n "$setting" ]; then
                 echo -e "${GREEN}Configuration Format:${NC} v1.x (legacy preset)"
@@ -192,15 +201,18 @@ show_current() {
 
                 case "$setting" in
                     1)
-                        local latency=$(calc_latency $PRESET1_RATE $PRESET1_PERIOD $PRESET1_NPERIODS)
+                        local latency
+                        latency=$(calc_latency "$PRESET1_RATE" "$PRESET1_PERIOD" "$PRESET1_NPERIODS")
                         echo -e "${CYAN}Description:${NC}   $PRESET1_NAME (${PRESET1_RATE}Hz, ${PRESET1_NPERIODS}x${PRESET1_PERIOD}, ~${latency}ms)"
                         ;;
                     2)
-                        local latency=$(calc_latency $PRESET2_RATE $PRESET2_PERIOD $PRESET2_NPERIODS)
+                        local latency
+                        latency=$(calc_latency "$PRESET2_RATE" "$PRESET2_PERIOD" "$PRESET2_NPERIODS")
                         echo -e "${CYAN}Description:${NC}   $PRESET2_NAME (${PRESET2_RATE}Hz, ${PRESET2_NPERIODS}x${PRESET2_PERIOD}, ~${latency}ms)"
                         ;;
                     3)
-                        local latency=$(calc_latency $PRESET3_RATE $PRESET3_PERIOD $PRESET3_NPERIODS)
+                        local latency
+                        latency=$(calc_latency "$PRESET3_RATE" "$PRESET3_PERIOD" "$PRESET3_NPERIODS")
                         echo -e "${CYAN}Description:${NC}   $PRESET3_NAME (${PRESET3_RATE}Hz, ${PRESET3_NPERIODS}x${PRESET3_PERIOD}, ~${latency}ms)"
                         ;;
                 esac
@@ -253,7 +265,8 @@ set_custom_setting() {
     mkdir -p "$SYSTEM_CONFIG_DIR"
 
     # Calculate latency
-    local latency=$(calc_latency $rate $period $nperiods)
+    local latency
+    latency=$(calc_latency "$rate" "$period" "$nperiods")
 
     # Create configuration file (v2.0 format)
     cat > "$SYSTEM_CONFIG_FILE" << EOF
@@ -261,7 +274,7 @@ set_custom_setting() {
 # Format: v2.0
 # Generated by motu-m4-jack-setting-system.sh on $(date)
 #
-# Sample Rate: $(printf "%'d" $rate) Hz
+# Sample Rate: $(printf "%'d" "$rate") Hz
 # Buffer Size: $period frames
 # Periods: $nperiods
 # Calculated Latency: ~${latency} ms
@@ -278,7 +291,7 @@ EOF
 
     echo -e "${GREEN}System-wide configuration saved!${NC}"
     echo ""
-    echo -e "${CYAN}Sample Rate:${NC}  $(printf "%'d" $rate) Hz"
+    echo -e "${CYAN}Sample Rate:${NC}  $(printf "%'d" "$rate") Hz"
     echo -e "${CYAN}Buffer Size:${NC}  $period frames"
     echo -e "${CYAN}Periods:${NC}      $nperiods"
     echo -e "${CYAN}Latency:${NC}      ~${latency} ms"

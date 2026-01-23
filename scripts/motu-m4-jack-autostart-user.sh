@@ -13,7 +13,6 @@ log "M4 Audio Interface erkannt - Starte JACK direkt (User-Kontext)"
 # Aktueller Benutzer
 USER=$(whoami)
 USER_ID=$(id -u)
-USER_HOME=$HOME
 
 log "Benutzer: $USER (ID: $USER_ID)"
 

@@ -26,7 +26,7 @@ USER="$ACTIVE_USER"
 log "Erkannter aktiver Benutzer: $USER"
 
 USER_ID=$(id -u "$USER")
-USER_HOME=$(getent passwd $USER | cut -d: -f6)
+USER_HOME=$(getent passwd "$USER" | cut -d: -f6)
 
 if [ -z "$USER_ID" ]; then
     log "Benutzer $USER nicht gefunden"
@@ -70,6 +70,6 @@ export XDG_RUNTIME_DIR=/run/user/$USER_ID
 export HOME=$USER_HOME
 
 # JACK-Init-Script als Benutzer ausführen
-runuser -l $USER -c "/usr/local/bin/motu-m4-jack-init.sh" >> $LOG 2>&1
+runuser -l "$USER" -c "/usr/local/bin/motu-m4-jack-init.sh" >> $LOG 2>&1
 
 log "JACK-Startbefehl abgeschlossen"
