@@ -21,11 +21,29 @@ import gi
 
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
+import logging
 import os
 import subprocess
 import threading
 
 from gi.repository import Gdk, GLib, Gtk
+
+# Configure logging for DBus operations and error tracking
+LOG_DIR = os.path.expanduser("~/.local/share/motu-m4")
+LOG_FILE = os.path.join(LOG_DIR, "gui.log")
+
+# Ensure log directory exists
+os.makedirs(LOG_DIR, exist_ok=True)
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(LOG_FILE),
+        logging.StreamHandler(),
+    ],
+)
+logger = logging.getLogger(__name__)
 
 
 class MotuM4JackGUI(Gtk.Window):
@@ -340,10 +358,16 @@ class MotuM4JackGUI(Gtk.Window):
 
             if style_context.lookup_color("success_color", rgba_success)[0]:
                 self.color_success = self._rgba_to_hex(rgba_success)
+                logger.debug("Using theme success color: %s", self.color_success)
             if style_context.lookup_color("error_color", rgba_error)[0]:
                 self.color_error = self._rgba_to_hex(rgba_error)
-        except Exception:
-            pass  # Use defaults
+                logger.debug("Using theme error color: %s", self.color_error)
+        except AttributeError as e:
+            logger.warning("GTK theme color lookup failed (missing attributes): %s", str(e))
+        except TypeError as e:
+            logger.warning("GTK theme color lookup failed (type error): %s", str(e))
+        except Exception as e:
+            logger.warning("Unexpected error looking up theme colors: %s", type(e).__name__)
 
     def _rgba_to_hex(self, rgba):
         """Convert Gdk.RGBA to hex color string"""
@@ -522,34 +546,45 @@ class MotuM4JackGUI(Gtk.Window):
                 try:
                     with open(config_file, "r") as f:
                         content = f.read()
+                        logger.info("Reading configuration from: %s", config_file)
 
                         # Check for v2.0 format
                         for line in content.splitlines():
-                            if line.startswith("JACK_RATE="):
-                                config["rate"] = int(line.split("=")[1].strip())
-                            elif line.startswith("JACK_PERIOD="):
-                                config["period"] = int(line.split("=")[1].strip())
-                            elif line.startswith("JACK_NPERIODS="):
-                                config["nperiods"] = int(line.split("=")[1].strip())
-                            elif line.startswith("A2J_ENABLE="):
-                                value = line.split("=")[1].strip().lower()
-                                config["a2j_enable"] = value in (
-                                    "true",
-                                    "yes",
-                                    "1",
-                                    "on",
-                                )
-                            elif line.startswith("JACK_SETTING="):
-                                # Legacy v1.x format
-                                setting = int(line.split("=")[1].strip())
-                                if setting in self.LEGACY_PRESETS:
-                                    preset = self.LEGACY_PRESETS[setting]
-                                    config["rate"] = preset["rate"]
-                                    config["period"] = preset["period"]
-                                    config["nperiods"] = preset["nperiods"]
+                            try:
+                                if line.startswith("JACK_RATE="):
+                                    config["rate"] = int(line.split("=")[1].strip())
+                                elif line.startswith("JACK_PERIOD="):
+                                    config["period"] = int(line.split("=")[1].strip())
+                                elif line.startswith("JACK_NPERIODS="):
+                                    config["nperiods"] = int(line.split("=")[1].strip())
+                                elif line.startswith("A2J_ENABLE="):
+                                    value = line.split("=")[1].strip().lower()
+                                    config["a2j_enable"] = value in (
+                                        "true",
+                                        "yes",
+                                        "1",
+                                        "on",
+                                    )
+                                elif line.startswith("JACK_SETTING="):
+                                    # Legacy v1.x format
+                                    setting = int(line.split("=")[1].strip())
+                                    if setting in self.LEGACY_PRESETS:
+                                        preset = self.LEGACY_PRESETS[setting]
+                                        config["rate"] = preset["rate"]
+                                        config["period"] = preset["period"]
+                                        config["nperiods"] = preset["nperiods"]
+                            except ValueError as e:
+                                logger.warning("Failed to parse config line '%s': %s", line, str(e))
+                                continue
                         break  # Use first found config
-                except Exception:
-                    pass
+                except FileNotFoundError:
+                    logger.warning("Config file not found: %s", config_file)
+                except PermissionError:
+                    logger.error("Permission denied reading config file: %s", config_file)
+                except IOError as e:
+                    logger.error("I/O error reading config file %s: %s", config_file, str(e))
+                except Exception as e:
+                    logger.exception("Unexpected error reading config from %s: %s", config_file, type(e).__name__)
 
         return config
 
@@ -583,10 +618,23 @@ class MotuM4JackGUI(Gtk.Window):
             )
             # Check for DBus errors (can happen at early boot)
             if "dbus" in result.stderr.lower() or "autolaunch" in result.stderr.lower():
+                logger.warning(
+                    "DBus error in a2j_control: %s", result.stderr.strip()
+                )
                 return False
             # Check for "Bridging enabled" (not "bridge is running")
             return "bridging enabled" in result.stdout.lower()
-        except Exception:
+        except subprocess.TimeoutExpired:
+            logger.error("a2j_control --status timed out after 5 seconds")
+            return False
+        except FileNotFoundError:
+            logger.error("a2j_control command not found - a2jmidid may not be installed")
+            return False
+        except subprocess.CalledProcessError as e:
+            logger.error("a2j_control failed with return code %d: %s", e.returncode, e.stderr)
+            return False
+        except Exception as e:
+            logger.exception("Unexpected error checking a2j status: %s", type(e).__name__)
             return False
 
     def check_jack_status(self):
@@ -597,9 +645,22 @@ class MotuM4JackGUI(Gtk.Window):
             )
             # Check for DBus errors (can happen at early boot)
             if "dbus" in result.stderr.lower() or "autolaunch" in result.stderr.lower():
+                logger.warning(
+                    "DBus error in jack_control: %s", result.stderr.strip()
+                )
                 return False
             return "started" in result.stdout.lower()
-        except Exception:
+        except subprocess.TimeoutExpired:
+            logger.error("jack_control status timed out after 5 seconds")
+            return False
+        except FileNotFoundError:
+            logger.error("jack_control command not found - JACK may not be installed")
+            return False
+        except subprocess.CalledProcessError as e:
+            logger.error("jack_control failed with return code %d: %s", e.returncode, e.stderr)
+            return False
+        except Exception as e:
+            logger.exception("Unexpected error checking JACK status: %s", type(e).__name__)
             return False
 
     def check_hardware(self):
@@ -609,7 +670,17 @@ class MotuM4JackGUI(Gtk.Window):
                 ["aplay", "-l"], capture_output=True, text=True, timeout=5
             )
             return "M4" in result.stdout
-        except Exception:
+        except subprocess.TimeoutExpired:
+            logger.error("aplay -l timed out after 5 seconds")
+            return False
+        except FileNotFoundError:
+            logger.error("aplay command not found - ALSA may not be installed")
+            return False
+        except subprocess.CalledProcessError as e:
+            logger.error("aplay failed with return code %d: %s", e.returncode, e.stderr)
+            return False
+        except Exception as e:
+            logger.exception("Unexpected error checking hardware: %s", type(e).__name__)
             return False
 
     def refresh_status(self):
@@ -667,10 +738,18 @@ class MotuM4JackGUI(Gtk.Window):
             if restart:
                 cmd.append("--restart")
 
+            logger.info("Applying settings: rate=%d, period=%d, nperiods=%d, a2j=%s, restart=%s",
+                       rate, period, nperiods, a2j_value, restart)
+
             # Execute script
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
 
             success = result.returncode == 0
+
+            if success:
+                logger.info("Settings applied successfully")
+            else:
+                logger.warning("Settings application failed: %s", result.stderr.strip())
 
             # UI update in main thread
             GLib.idle_add(
@@ -678,9 +757,25 @@ class MotuM4JackGUI(Gtk.Window):
             )
 
         except subprocess.TimeoutExpired:
-            GLib.idle_add(self.on_apply_complete, False, "Timeout")
+            error_msg = "Settings application timed out after 60 seconds"
+            logger.error(error_msg)
+            GLib.idle_add(self.on_apply_complete, False, error_msg)
+        except FileNotFoundError:
+            error_msg = f"Setting script not found: {self.SETTING_SCRIPT}"
+            logger.error(error_msg)
+            GLib.idle_add(self.on_apply_complete, False, error_msg)
+        except subprocess.CalledProcessError as e:
+            error_msg = f"pkexec authorization failed or script error (code {e.returncode})"
+            logger.error("Settings application failed: %s - %s", error_msg, e.stderr)
+            GLib.idle_add(self.on_apply_complete, False, error_msg)
+        except PermissionError:
+            error_msg = "Permission denied - unable to execute settings script"
+            logger.error(error_msg)
+            GLib.idle_add(self.on_apply_complete, False, error_msg)
         except Exception as e:
-            GLib.idle_add(self.on_apply_complete, False, str(e))
+            error_msg = f"Unexpected error applying settings: {type(e).__name__}: {str(e)}"
+            logger.exception(error_msg)
+            GLib.idle_add(self.on_apply_complete, False, error_msg)
 
     def on_apply_complete(self, success, error_msg):
         """Callback after setting application completes"""
