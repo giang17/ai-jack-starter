@@ -19,14 +19,29 @@
 # License: GPL-3.0-or-later
 # =============================================================================
 
-# Log file path (consistent with other scripts)
-# Use /run/ai-jack if writable, otherwise fall back to /tmp
-if mkdir -p /run/ai-jack 2>/dev/null && [ -w /run/ai-jack ]; then
-    LOG="/run/ai-jack/jack-init.log"
+# =============================================================================
+# Logging Setup
+# =============================================================================
+# Source centralized logging library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/ai-jack-logging.sh" ]; then
+    source "$SCRIPT_DIR/ai-jack-logging.sh"
+elif [ -f "/usr/local/bin/ai-jack-logging.sh" ]; then
+    source "/usr/local/bin/ai-jack-logging.sh"
 else
-    mkdir -p /tmp/ai-jack 2>/dev/null
-    LOG="/tmp/ai-jack/jack-init.log"
+    # Fallback: define minimal logging functions
+    log_debug() { :; }
+    log_info() { echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $1"; }
+    log_warn() { echo "$(date '+%Y-%m-%d %H:%M:%S') [WARN] $1" >&2; }
+    log_error() { echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $1" >&2; }
+    fail() { log_error "$1"; exit 1; }
 fi
+
+# Initialize logging for this script
+init_logging "jack-init" "jack-init.log"
+
+# Legacy LOG variable for compatibility
+LOG=$(get_log_file)
 
 # =============================================================================
 # Default Configuration
@@ -79,16 +94,12 @@ else
 fi
 
 # =============================================================================
-# Logging Functions
+# Legacy Logging Wrapper (for backward compatibility)
 # =============================================================================
+# The log() function is now provided by ai-jack-logging.sh
+# This wrapper ensures old code using log() still works
 log() {
-    echo "$(date): $1" >> $LOG
-}
-
-fail() {
-    echo "ERROR: $1"
-    log "ERROR: $1"
-    exit 1
+    log_info "$1"
 }
 
 # =============================================================================
@@ -289,18 +300,18 @@ case "$ACTIVE_RATE" in
     22050|44100|48000|88200|96000|176400|192000)
         ;;
     *)
-        log "WARNING: Unusual sample rate $ACTIVE_RATE - using anyway"
+        log_warn "Unusual sample rate $ACTIVE_RATE - using anyway"
         ;;
 esac
 
 # Validate period (buffer size)
 if [ "$ACTIVE_PERIOD" -lt 16 ] || [ "$ACTIVE_PERIOD" -gt 8192 ]; then
-    log "WARNING: Period $ACTIVE_PERIOD outside typical range (16-8192)"
+    log_warn "Period $ACTIVE_PERIOD outside typical range (16-8192)"
 fi
 
 # Validate nperiods
 if [ "$ACTIVE_NPERIODS" -lt 2 ] || [ "$ACTIVE_NPERIODS" -gt 8 ]; then
-    log "WARNING: Nperiods $ACTIVE_NPERIODS outside typical range (2-8)"
+    log_warn "Nperiods $ACTIVE_NPERIODS outside typical range (2-8)"
 fi
 
 # Calculate latency for logging
@@ -311,16 +322,14 @@ ACTIVE_DESC="Custom (${ACTIVE_RATE}Hz, ${ACTIVE_NPERIODS}x${ACTIVE_PERIOD}, ~${L
 # Debug Logging
 # =============================================================================
 log_config_debug() {
-    {
-        echo "$(date): CONFIG DEBUG - ACTUAL_USER: ${ACTUAL_USER:-unset}"
-        echo "$(date): CONFIG DEBUG - USER_CONFIG_FILE: $USER_CONFIG_FILE"
-        echo "$(date): CONFIG DEBUG - SYSTEM_CONFIG_FILE: $SYSTEM_CONFIG_FILE"
-        echo "$(date): CONFIG DEBUG - Config source: $config_source"
-        echo "$(date): CONFIG DEBUG - Audio Device: $ACTIVE_AUDIO_DEVICE"
-        echo "$(date): CONFIG DEBUG - Device Pattern: ${ACTIVE_DEVICE_PATTERN:-<none>}"
-        echo "$(date): CONFIG DEBUG - Final config: Rate=$ACTIVE_RATE, Period=$ACTIVE_PERIOD, Nperiods=$ACTIVE_NPERIODS, A2J=$ACTIVE_A2J_ENABLE"
-        echo "$(date): CONFIG DEBUG - Calculated latency: ${LATENCY_MS}ms"
-    } >> $LOG
+    log_debug "CONFIG - ACTUAL_USER: ${ACTUAL_USER:-unset}"
+    log_debug "CONFIG - USER_CONFIG_FILE: $USER_CONFIG_FILE"
+    log_debug "CONFIG - SYSTEM_CONFIG_FILE: $SYSTEM_CONFIG_FILE"
+    log_debug "CONFIG - Config source: $config_source"
+    log_debug "CONFIG - Audio Device: $ACTIVE_AUDIO_DEVICE"
+    log_debug "CONFIG - Device Pattern: ${ACTIVE_DEVICE_PATTERN:-<none>}"
+    log_debug "CONFIG - Final config: Rate=$ACTIVE_RATE, Period=$ACTIVE_PERIOD, Nperiods=$ACTIVE_NPERIODS, A2J=$ACTIVE_A2J_ENABLE"
+    log_debug "CONFIG - Calculated latency: ${LATENCY_MS}ms"
 }
 
 # Log debug information
@@ -436,13 +445,13 @@ safe_a2j_control() {
 
     # Check for DBus errors
     if echo "$result" | grep -qi "dbus\|autolaunch"; then
-        log "WARNING: a2j_control $cmd failed - DBus not available"
+        log_warn "a2j_control $cmd failed - DBus not available"
         echo "Note: a2j_control $cmd unavailable (DBus not ready)"
         return 1
     fi
 
     if [ $exit_code -ne 0 ]; then
-        log "WARNING: a2j_control $cmd returned $exit_code: $result"
+        log_warn "a2j_control $cmd returned $exit_code: $result"
     fi
     return $exit_code
 }
