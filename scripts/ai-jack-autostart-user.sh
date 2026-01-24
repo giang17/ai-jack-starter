@@ -11,8 +11,13 @@
 # License: GPL-3.0-or-later
 # =============================================================================
 
-# Log file path
-LOG="/run/ai-jack/jack-autostart-user.log"
+# Log file path - use /run/ai-jack if writable, otherwise /tmp
+if mkdir -p /run/ai-jack 2>/dev/null && [ -w /run/ai-jack ]; then
+    LOG="/run/ai-jack/jack-autostart-user.log"
+else
+    mkdir -p /tmp/ai-jack 2>/dev/null
+    LOG="/tmp/ai-jack/jack-autostart-user.log"
+fi
 
 # =============================================================================
 # Logging Function

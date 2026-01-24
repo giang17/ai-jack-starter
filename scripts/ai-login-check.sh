@@ -11,8 +11,13 @@
 # License: GPL-3.0-or-later
 # =============================================================================
 
-# Log file path
-LOG="/run/ai-jack/jack-login-check.log"
+# Log file path - use /run/ai-jack if writable, otherwise /tmp
+if mkdir -p /run/ai-jack 2>/dev/null && [ -w /run/ai-jack ]; then
+    LOG="/run/ai-jack/jack-login-check.log"
+else
+    mkdir -p /tmp/ai-jack 2>/dev/null
+    LOG="/tmp/ai-jack/jack-login-check.log"
+fi
 
 # =============================================================================
 # Logging Function
@@ -21,9 +26,6 @@ LOG="/run/ai-jack/jack-login-check.log"
 log() {
     echo "$(date): $1" >> $LOG
 }
-
-# Ensure log directory exists
-mkdir -p /run/ai-jack
 
 log "Login check: Starting after boot"
 
@@ -81,13 +83,13 @@ if [ -f /run/ai-jack/device-detected ]; then
     # Check if device is still actually connected
     DEVICE_FOUND=false
     if [ -n "$DEVICE_PATTERN" ]; then
-        if aplay -l | grep -q "$DEVICE_PATTERN"; then
+        if LC_ALL=C aplay -l | grep -q "$DEVICE_PATTERN"; then
             DEVICE_FOUND=true
             log "Login check: Device matching '$DEVICE_PATTERN' is connected"
         fi
     else
         # No pattern - assume device is present if any sound card exists
-        if aplay -l | grep -q "card"; then
+        if LC_ALL=C aplay -l | grep -q "card"; then
             DEVICE_FOUND=true
             log "Login check: Audio device is connected (no pattern configured)"
         fi

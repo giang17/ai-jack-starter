@@ -89,10 +89,10 @@ configure_audio_device() {
     echo -e "${BLUE}=============================================${NC}"
     echo ""
 
-    # Show detected audio devices
+    # Show detected audio devices (force English output with LC_ALL=C)
     echo -e "${CYAN}Detected audio devices:${NC}"
     echo ""
-    aplay -l 2>/dev/null | grep -E "^card [0-9]+" || echo "  No audio devices found"
+    LC_ALL=C aplay -l 2>/dev/null | grep -E "^card [0-9]+" || echo "  No audio devices found"
     echo ""
 
     # Get actual user for later
@@ -139,17 +139,17 @@ configure_device_interactive() {
     local default_device="hw:0,0"
     local default_pattern=""
 
-    # Check for common interfaces
-    if aplay -l 2>/dev/null | grep -q "M4"; then
+    # Check for common interfaces (force English output with LC_ALL=C)
+    if LC_ALL=C aplay -l 2>/dev/null | grep -q "M4"; then
         default_device="hw:M4,0"
         default_pattern="M4"
-    elif aplay -l 2>/dev/null | grep -q "Scarlett"; then
+    elif LC_ALL=C aplay -l 2>/dev/null | grep -q "Scarlett"; then
         default_device="hw:USB,0"
         default_pattern="Scarlett"
-    elif aplay -l 2>/dev/null | grep -q "Babyface"; then
+    elif LC_ALL=C aplay -l 2>/dev/null | grep -q "Babyface"; then
         default_device="hw:Babyface,0"
         default_pattern="Babyface"
-    elif aplay -l 2>/dev/null | grep -q "Focusrite"; then
+    elif LC_ALL=C aplay -l 2>/dev/null | grep -q "Focusrite"; then
         default_device="hw:USB,0"
         default_pattern="Focusrite"
     fi

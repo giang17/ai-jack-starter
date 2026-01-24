@@ -454,8 +454,11 @@ class AudioInterfaceJackGUI(Gtk.Window):
         self.device_combo.remove_all()
 
         try:
+            # Force English output by setting LC_ALL=C
+            env = os.environ.copy()
+            env["LC_ALL"] = "C"
             result = subprocess.run(
-                ["aplay", "-l"], capture_output=True, text=True, timeout=5
+                ["aplay", "-l"], capture_output=True, text=True, timeout=5, env=env
             )
 
             # Parse aplay output

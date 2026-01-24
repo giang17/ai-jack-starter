@@ -20,10 +20,13 @@
 # =============================================================================
 
 # Log file path (consistent with other scripts)
-LOG="/run/ai-jack/jack-init.log"
-
-# Ensure log directory exists
-mkdir -p /run/ai-jack 2>/dev/null || true
+# Use /run/ai-jack if writable, otherwise fall back to /tmp
+if mkdir -p /run/ai-jack 2>/dev/null && [ -w /run/ai-jack ]; then
+    LOG="/run/ai-jack/jack-init.log"
+else
+    mkdir -p /tmp/ai-jack 2>/dev/null
+    LOG="/tmp/ai-jack/jack-init.log"
+fi
 
 # =============================================================================
 # Default Configuration
@@ -329,7 +332,7 @@ log_config_debug
 
 # Check if audio interface is available (only if DEVICE_PATTERN is set)
 if [ -n "$ACTIVE_DEVICE_PATTERN" ]; then
-    if ! aplay -l | grep -q "$ACTIVE_DEVICE_PATTERN"; then
+    if ! LC_ALL=C aplay -l | grep -q "$ACTIVE_DEVICE_PATTERN"; then
         fail "Audio interface '$ACTIVE_DEVICE_PATTERN' not found. Please connect or power on the device."
     fi
     log "Hardware check passed: Found device matching pattern '$ACTIVE_DEVICE_PATTERN'"

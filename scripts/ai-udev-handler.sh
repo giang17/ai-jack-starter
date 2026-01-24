@@ -19,12 +19,15 @@
 ACTION="$1"
 KERNEL="$2"
 
-# Log file path
-LOG="/run/ai-jack/jack-udev-handler.log"
-
-# Ensure log directory exists
-mkdir -p /run/ai-jack
-chmod 777 /run/ai-jack
+# Log file path - use /run/ai-jack if writable, otherwise /tmp
+if mkdir -p /run/ai-jack 2>/dev/null; then
+    chmod 777 /run/ai-jack 2>/dev/null
+    LOG="/run/ai-jack/jack-udev-handler.log"
+else
+    mkdir -p /tmp/ai-jack 2>/dev/null
+    chmod 777 /tmp/ai-jack 2>/dev/null
+    LOG="/tmp/ai-jack/jack-udev-handler.log"
+fi
 
 # =============================================================================
 # Configuration Loading
@@ -80,7 +83,7 @@ if [ "$ACTION" = "add" ] && [[ "$KERNEL" == controlC* ]]; then
     sleep 2
 
     log "DEBUG: Running aplay -l..."
-    APLAY_OUTPUT=$(aplay -l 2>&1 || echo "aplay command failed")
+    APLAY_OUTPUT=$(LC_ALL=C aplay -l 2>&1 || echo "aplay command failed")
     log "DEBUG: aplay output: $APLAY_OUTPUT"
 
     # Check for device - either using pattern or always start if no pattern configured
@@ -130,7 +133,7 @@ elif [ "$ACTION" = "remove" ] && [[ "$KERNEL" == card* ]]; then
     # Check if device is still available
     DEVICE_STILL_PRESENT=false
     if [ -n "$DEVICE_PATTERN" ]; then
-        if aplay -l | grep -q "$DEVICE_PATTERN"; then
+        if LC_ALL=C aplay -l | grep -q "$DEVICE_PATTERN"; then
             DEVICE_STILL_PRESENT=true
         fi
     fi
