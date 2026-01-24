@@ -1,89 +1,115 @@
 #!/bin/bash
 
-# Parameter von UDEV
+# =============================================================================
+# MOTU M4 UDEV Event Handler
+# =============================================================================
+# This script is triggered by UDEV when a sound device is added/removed.
+# It detects M4 connections and calls appropriate startup/shutdown scripts.
+#
+# Parameters from UDEV:
+#   $1 (ACTION): "add" or "remove"
+#   $2 (KERNEL): Device kernel name (e.g., "controlC0", "card0")
+#
+# Copyright (C) 2025
+# License: GPL-3.0-or-later
+# =============================================================================
+
+# UDEV event parameters
 ACTION="$1"
 KERNEL="$2"
 
-# Pfad zum Log-File
-LOG="/run/motu-m4/jack-uvdev-handler.log"
+# Log file path
+LOG="/run/motu-m4/jack-udev-handler.log"
 
-# Sicherstellen, dass das Verzeichnis existiert
+# Ensure log directory exists
 mkdir -p /run/motu-m4
 chmod 777 /run/motu-m4
 
-# Logging-Funktion mit Error-Handling
+# =============================================================================
+# Logging and Error Handling
+# =============================================================================
+
+# Logging function with error handling
 log() {
     echo "$(date): $1" >> $LOG 2>&1
 }
 
-# Fehler-Handling
+# Set error trap to catch failures
 set -e
-trap 'log "ERROR: Script abgebrochen in Zeile $LINENO"' ERR
+trap 'log "ERROR: Script failed at line $LINENO"' ERR
 
-log "UDEV-Handler aufgerufen: ACTION=$ACTION KERNEL=$KERNEL"
+log "UDEV handler called: ACTION=$ACTION KERNEL=$KERNEL"
+
+# =============================================================================
+# Device Addition Handler (when M4 is connected)
+# =============================================================================
 
 if [ "$ACTION" = "add" ] && [[ "$KERNEL" == controlC* ]]; then
-    log "Sound-Controller hinzugefügt, prüfe auf M4..."
+    log "Sound controller added, checking for M4..."
 
-    # Prüfe auf eingeloggten Benutzer (flexiblere Suche nach X11-Sessions)
-    log "DEBUG: Prüfe who-Befehl..."
-    WHO_OUTPUT=$(who 2>&1 || echo "who-Befehl fehlgeschlagen")
-    log "DEBUG: who-Ausgabe: $WHO_OUTPUT"
+    # Check for logged-in user (flexible X11 session detection)
+    log "DEBUG: Running who command..."
+    WHO_OUTPUT=$(who 2>&1 || echo "who command failed")
+    log "DEBUG: who output: $WHO_OUTPUT"
 
-    # Suche nach beliebigem X11-Display (:0, :1, etc.)
+    # Search for any X11 display session (:0, :1, etc.)
     USER_LOGGED_IN=$(echo "$WHO_OUTPUT" | grep "(:" | head -n1 | awk '{print $1}' || echo "")
-    log "DEBUG: Gefundener Benutzer: [$USER_LOGGED_IN]"
+    log "DEBUG: Found user: [$USER_LOGGED_IN]"
 
     if [ -z "$USER_LOGGED_IN" ]; then
-        log "Kein Benutzer eingeloggt, erstelle Trigger-Datei"
+        log "No user logged in, creating trigger file"
         touch /run/motu-m4/m4-detected
-        log "DEBUG: Trigger-Datei erstellt"
+        log "DEBUG: Trigger file created"
         exit 0
     fi
 
-    log "DEBUG: Benutzer ist eingeloggt, prüfe Hardware"
+    log "DEBUG: User is logged in, checking hardware"
     sleep 2
 
-    log "DEBUG: Führe aplay -l aus..."
-    APLAY_OUTPUT=$(aplay -l 2>&1 || echo "aplay-Befehl fehlgeschlagen")
-    log "DEBUG: aplay-Ausgabe: $APLAY_OUTPUT"
+    log "DEBUG: Running aplay -l..."
+    APLAY_OUTPUT=$(aplay -l 2>&1 || echo "aplay command failed")
+    log "DEBUG: aplay output: $APLAY_OUTPUT"
 
     if echo "$APLAY_OUTPUT" | grep -q "M4"; then
-        log "M4 gefunden, Benutzer $USER_LOGGED_IN eingeloggt, starte JACK"
-        log "DEBUG: Rufe motu-m4-jack-autostart.sh auf..."
-        /usr/local/bin/motu-m4-jack-autostart.sh >> $LOG 2>&1 || log "ERROR: Autostart-Script fehlgeschlagen"
+        log "M4 found, user $USER_LOGGED_IN logged in, starting JACK"
+        log "DEBUG: Calling motu-m4-jack-autostart.sh..."
+        /usr/local/bin/motu-m4-jack-autostart.sh >> $LOG 2>&1 || log "ERROR: Autostart script failed"
 
-        # 🎵 HINWEIS: Dynamic-Optimizer läuft separat als System-Service
-        log "DEBUG: Dynamic-Optimizer läuft unabhängig als System-Service"
+        # NOTE: Dynamic optimizer runs separately as system service
+        log "DEBUG: Dynamic optimizer runs independently as system service"
 
-        # Asynchrone Ausführung
+        # Async execution (commented out - runs synchronously instead)
         # nohup /usr/local/bin/motu-m4-jack-autostart.sh >> $LOG 2>&1 &
     else
-        log "Kein M4 gefunden"
+        log "No M4 found"
     fi
 
-elif [ "$ACTION" = "remove" ] && [[ "$KERNEL" == card* ]]; then
-    log "Sound-Karte entfernt, prüfe auf M4..."
+# =============================================================================
+# Device Removal Handler (when M4 is disconnected)
+# =============================================================================
 
-    # Trigger-Datei entfernen
+elif [ "$ACTION" = "remove" ] && [[ "$KERNEL" == card* ]]; then
+    log "Sound device removed, checking for M4..."
+
+    # Remove trigger file
     rm -f /run/motu-m4/m4-detected 2>/dev/null
 
-    # Prüfe auf eingeloggten Benutzer (flexiblere Suche)
+    # Check for logged-in user (flexible search)
     USER_LOGGED_IN=$(who | grep "(:" | head -n1 | awk '{print $1}' || echo "")
 
     if [ -z "$USER_LOGGED_IN" ]; then
-        log "Kein Benutzer eingeloggt, überspringe JACK-Shutdown"
+        log "No user logged in, skipping JACK shutdown"
         exit 0
     fi
 
     sleep 2
 
     if ! aplay -l | grep -q "M4"; then
-        log "M4 nicht mehr vorhanden, Benutzer $USER_LOGGED_IN eingeloggt, beende JACK"
-        /usr/local/bin/motu-m4-jack-shutdown.sh >> $LOG 2>&1 || log "ERROR: Shutdown-Script fehlgeschlagen"
+        log "M4 no longer available, user $USER_LOGGED_IN logged in, stopping JACK"
+        /usr/local/bin/motu-m4-jack-shutdown.sh >> $LOG 2>&1 || log "ERROR: Shutdown script failed"
     else
-        log "M4 noch vorhanden"
+        log "M4 still available"
     fi
 fi
 
-log "UDEV-Handler beendet"
+log "UDEV handler completed"
