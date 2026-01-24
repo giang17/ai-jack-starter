@@ -332,11 +332,6 @@ class AudioInterfaceJackGUI(Gtk.Window):
         button_box.set_halign(Gtk.Align.END)
         main_box.pack_start(button_box, False, False, 5)
 
-        # Refresh button
-        refresh_button = Gtk.Button(label="Refresh")
-        refresh_button.connect("clicked", self.on_refresh_clicked)
-        button_box.pack_start(refresh_button, False, False, 0)
-
         # Apply button
         self.apply_button = Gtk.Button(label="Apply")
         self.apply_button.get_style_context().add_class("suggested-action")
@@ -915,12 +910,6 @@ class AudioInterfaceJackGUI(Gtk.Window):
     def set_status(self, message):
         """Sets the status bar message"""
         self.statusbar.set_markup(f"<small>{message}</small>")
-
-    def on_refresh_clicked(self, button):
-        """Handler for refresh button"""
-        self.refresh_status()
-        self.load_current_config()
-        self.update_latency_display()
 
     def on_apply_clicked(self, button):
         """Handler for apply button"""
