@@ -1,45 +1,70 @@
 #!/bin/bash
 
-# Pfad zum Log-File
+# =============================================================================
+# MOTU M4 JACK Autostart Script - User Context
+# =============================================================================
+# Called from motu-m4-login-check.service after user login.
+# Runs in user context with appropriate environment variables already set.
+#
+# Copyright (C) 2025
+# License: GPL-3.0-or-later
+# =============================================================================
+
+# Log file path
 LOG="/run/motu-m4/jack-autostart-user.log"
 
-# Logging-Funktion
+# =============================================================================
+# Logging Function
+# =============================================================================
+
 log() {
     echo "$(date): $1" >> $LOG
 }
 
-log "M4 Audio Interface erkannt - Starte JACK direkt (User-Kontext)"
+log "M4 Audio Interface detected - Starting JACK directly (user context)"
 
-# Aktueller Benutzer
+# =============================================================================
+# User and Session Information
+# =============================================================================
+
+# Current user information
 USER=$(whoami)
 USER_ID=$(id -u)
 
-log "Benutzer: $USER (ID: $USER_ID)"
+log "User: $USER (ID: $USER_ID)"
 
-# Auf DBUS-Socket warten
+# =============================================================================
+# DBus Session Bus Verification
+# =============================================================================
+
+# Wait for DBUS socket to become available
 DBUS_SOCKET="/run/user/$USER_ID/bus"
 WAIT_TIME=0
 MAX_WAIT=30
 
-log "Prüfe DBUS-Socket: $DBUS_SOCKET"
+log "Checking DBUS socket: $DBUS_SOCKET"
 while [ ! -e "$DBUS_SOCKET" ] && [ $WAIT_TIME -lt $MAX_WAIT ]; do
-    log "Warte auf DBUS-Socket... ($WAIT_TIME/$MAX_WAIT s)"
+    log "Waiting for DBUS socket... ($WAIT_TIME/$MAX_WAIT s)"
     sleep 1
     WAIT_TIME=$((WAIT_TIME + 1))
 done
 
 if [ ! -e "$DBUS_SOCKET" ]; then
-    log "DBUS-Socket nicht gefunden nach $MAX_WAIT Sekunden. Versuche trotzdem fortzufahren."
+    log "DBUS socket not found after $MAX_WAIT seconds. Continuing anyway."
 fi
 
-log "Starte JACK direkt für Benutzer: $USER"
+log "Starting JACK directly for user: $USER"
 
-# Umgebungsvariablen setzen
+# =============================================================================
+# User Context Execution
+# =============================================================================
+
+# Set environment variables
 export DISPLAY=:1
 export DBUS_SESSION_BUS_ADDRESS=unix:path=$DBUS_SOCKET
 export XDG_RUNTIME_DIR=/run/user/$USER_ID
 
-# JACK-Init-Script direkt ausführen (wir sind bereits der richtige Benutzer)
+# Execute JACK initialization script directly (we are already the correct user)
 /usr/local/bin/motu-m4-jack-init.sh >> $LOG 2>&1
 
-log "JACK-Startbefehl abgeschlossen"
+log "JACK startup command completed"

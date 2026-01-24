@@ -1,30 +1,47 @@
 #!/bin/bash
 
-# Pfad zum Log-File
+# =============================================================================
+# MOTU M4 Login Check Service
+# =============================================================================
+# Runs after user login (via systemd motu-m4-login-check.service).
+# Checks if M4 was connected before user login and starts JACK if needed.
+#
+# Copyright (C) 2025
+# License: GPL-3.0-or-later
+# =============================================================================
+
+# Log file path
 LOG="/run/motu-m4/jack-login-check.log"
 
-# Logging-Funktion
+# =============================================================================
+# Logging Function
+# =============================================================================
+
 log() {
     echo "$(date): $1" >> $LOG
 }
 
-# Sicherstellen, dass das Verzeichnis existiert
+# Ensure log directory exists
 mkdir -p /run/motu-m4
 
-log "Login-Check: Starte nach dem Boot"
+log "Login check: Starting after boot"
 
-# Warte, bis der Benutzer vollständig eingeloggt ist
-MAX_WAIT=120  # 2 Minuten warten
+# =============================================================================
+# Wait for User Login
+# =============================================================================
+
+# Wait until user is fully logged in
+MAX_WAIT=120  # Wait maximum 2 minutes
 WAIT_TIME=0
 
-log "Login-Check: Warte auf Benutzer-Login..."
+log "Login check: Waiting for user login..."
 
 while [ $WAIT_TIME -lt $MAX_WAIT ]; do
-    # Prüfe auf eingeloggten Benutzer mit X11-Display
+    # Check for logged-in user with X11 display
     USER_LOGGED_IN=$(who | grep "(:" | head -n1 | awk '{print $1}')
 
     if [ -n "$USER_LOGGED_IN" ]; then
-        log "Login-Check: Benutzer $USER_LOGGED_IN eingeloggt nach $WAIT_TIME Sekunden"
+        log "Login check: User $USER_LOGGED_IN logged in after $WAIT_TIME seconds"
         break
     fi
 
@@ -33,33 +50,41 @@ while [ $WAIT_TIME -lt $MAX_WAIT ]; do
 done
 
 if [ -z "$USER_LOGGED_IN" ]; then
-    log "Login-Check: Kein Benutzer nach $MAX_WAIT Sekunden eingeloggt, breche ab"
+    log "Login check: No user logged in after $MAX_WAIT seconds, aborting"
     exit 1
 fi
 
-log "Login-Check: Prüfe auf bereits angeschlossene M4"
+log "Login check: Checking for pre-connected M4"
 
-# Prüfen, ob eine Trigger-Datei existiert (M4 wurde beim Boot erkannt)
+# =============================================================================
+# Pre-Boot M4 Detection
+# =============================================================================
+
+# Check if trigger file exists (M4 was detected during boot)
 if [ -f /run/motu-m4/m4-detected ]; then
-    log "Login-Check: M4-Trigger-Datei gefunden, prüfe Hardware"
+    log "Login check: M4 trigger file found, checking hardware"
 
-    # Prüfen, ob M4 tatsächlich noch angeschlossen ist
+    # Check if M4 is still actually connected
     if aplay -l | grep -q "M4"; then
-        log "Login-Check: M4 ist angeschlossen, starte JACK"
-        # Verwende das User-Script, da wir als Benutzer laufen
+        log "Login check: M4 is connected, starting JACK"
+        # Use user script since we are running as user
         /usr/local/bin/motu-m4-jack-autostart-user.sh >> $LOG 2>&1
     else
-        log "Login-Check: M4 nicht mehr angeschlossen"
+        log "Login check: M4 no longer connected"
     fi
 
-    # Trigger-Datei entfernen
+    # Remove trigger file
     rm -f /run/motu-m4/m4-detected
-    log "Login-Check: Trigger-Datei entfernt"
+    log "Login check: Trigger file removed"
 else
-    log "Login-Check: Keine M4-Trigger-Datei gefunden"
+    log "Login check: No M4 trigger file found"
 fi
 
-# 🎵 HINWEIS: Dynamic-Optimizer läuft separat als System-Service
-log "Login-Check: Dynamic-Optimizer läuft unabhängig als System-Service"
+# =============================================================================
+# Service Notes
+# =============================================================================
 
-log "Login-Check: Beendet"
+# NOTE: Dynamic optimizer runs separately as system service
+log "Login check: Dynamic optimizer runs independently as system service"
+
+log "Login check: Completed"
