@@ -4,7 +4,7 @@ Automatic JACK audio server management for the MOTU M4 USB audio interface. Star
 
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)
 ![Ubuntu Studio](https://img.shields.io/badge/Ubuntu%20Studio-24.04+-orange.svg)
-![Version](https://img.shields.io/badge/version-2.0.0-green.svg)
+![Version](https://img.shields.io/badge/version-2.1.3-green.svg)
 
 ## Features
 
@@ -144,34 +144,9 @@ See [INSTALL.md](INSTALL.md) for:
 
 ## Changelog
 
-### v2.1.1
+See [CHANGELOG.md](CHANGELOG.md) for detailed version history.
 
-- **Fixed DBus crash at boot** - A2J status check now handles DBus errors gracefully
-- **Fixed A2J status display** - Correctly detects "Bridging enabled" instead of "bridge is running"
-- **Improved A2J stop logic** - Uses pgrep fallback when DBus is not available
-
-### v2.1.0
-
-- **A2J MIDI Bridge toggle** - Enable/disable a2jmidid directly from GUI
-- **A2J status indicator** - Shows whether a2jmidid is running or stopped
-- **Automatic status refresh** - Status updates every 5 seconds
-- **Fixes "device busy" errors** - Modern DAWs (Bitwig, Reaper) can now access MIDI directly
-
-### v2.0.0
-
-- **New flexible configuration** - Custom sample rate, buffer size, and periods
-- **Redesigned GUI** - Dropdowns and spinbutton instead of fixed presets
-- **Live latency calculation** - See latency as you adjust settings
-- **Quick preset buttons** - Fast access to common configurations
-- **Backward compatible** - Legacy preset syntax (1, 2, 3) still works
-- **Improved config format** - New v2.0 format with automatic migration
-
-### v1.0.0
-
-- Initial release with 3 fixed presets
-- Automatic JACK start/stop
-- GTK3 GUI
-- UDEV and systemd integration
+For release notes with download links, see [GitHub Releases](https://github.com/giang17/motu-m4-jack-starter/releases).
 
 ## License
 
