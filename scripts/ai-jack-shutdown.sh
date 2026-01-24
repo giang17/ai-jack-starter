@@ -10,20 +10,31 @@
 # License: GPL-3.0-or-later
 # =============================================================================
 
-# Log file path - use /run/ai-jack if writable, otherwise /tmp
-if mkdir -p /run/ai-jack 2>/dev/null && [ -w /run/ai-jack ]; then
-    LOG="/run/ai-jack/jack-shutdown.log"
+# =============================================================================
+# Logging Setup
+# =============================================================================
+# Source centralized logging library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/ai-jack-logging.sh" ]; then
+    source "$SCRIPT_DIR/ai-jack-logging.sh"
+elif [ -f "/usr/local/bin/ai-jack-logging.sh" ]; then
+    source "/usr/local/bin/ai-jack-logging.sh"
 else
-    mkdir -p /tmp/ai-jack 2>/dev/null
-    LOG="/tmp/ai-jack/jack-shutdown.log"
+    # Fallback: define minimal logging functions
+    log_debug() { :; }
+    log_info() { echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $1"; }
+    log_warn() { echo "$(date '+%Y-%m-%d %H:%M:%S') [WARN] $1" >&2; }
+    log_error() { echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $1" >&2; }
 fi
 
-# Logging function
-log() {
-    echo "$(date): $1" >> $LOG
-}
+# Initialize logging for this script
+init_logging "shutdown" "jack-shutdown.log"
 
-log "Audio Interface removed - Shutting down JACK"
+# Legacy LOG variable and log() function for compatibility
+LOG=$(get_log_file)
+log() { log_info "$1"; }
+
+log_info "Audio Interface removed - Shutting down JACK"
 
 # Dynamic detection of active user
 ACTIVE_USER=$(who | grep "(:" | head -n1 | awk '{print $1}')
@@ -34,14 +45,14 @@ if [ -z "$ACTIVE_USER" ]; then
 fi
 
 if [ -z "$ACTIVE_USER" ]; then
-    log "WARNING: No active user detected - trying to continue anyway"
+    log_warn "No active user detected - trying to continue anyway"
     USER="${USER:-root}"
 else
     USER="$ACTIVE_USER"
 fi
 USER_ID=$(id -u "$USER" 2>/dev/null || echo "")
 
-log "Stopping JACK for user: $USER"
+log_info "Stopping JACK for user: $USER"
 
 # Set environment variables
 export DISPLAY=:1
@@ -94,4 +105,4 @@ rm -f /dev/shm/jack-*-$USER_ID 2>/dev/null
 # Brief pause to ensure all resources are released
 sleep 2
 
-log "JACK server completely stopped and cleaned up"
+log_info "JACK server completely stopped and cleaned up"

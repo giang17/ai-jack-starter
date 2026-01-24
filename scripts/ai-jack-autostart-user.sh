@@ -11,23 +11,31 @@
 # License: GPL-3.0-or-later
 # =============================================================================
 
-# Log file path - use /run/ai-jack if writable, otherwise /tmp
-if mkdir -p /run/ai-jack 2>/dev/null && [ -w /run/ai-jack ]; then
-    LOG="/run/ai-jack/jack-autostart-user.log"
+# =============================================================================
+# Logging Setup
+# =============================================================================
+# Source centralized logging library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/ai-jack-logging.sh" ]; then
+    source "$SCRIPT_DIR/ai-jack-logging.sh"
+elif [ -f "/usr/local/bin/ai-jack-logging.sh" ]; then
+    source "/usr/local/bin/ai-jack-logging.sh"
 else
-    mkdir -p /tmp/ai-jack 2>/dev/null
-    LOG="/tmp/ai-jack/jack-autostart-user.log"
+    # Fallback: define minimal logging functions
+    log_debug() { :; }
+    log_info() { echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $1"; }
+    log_warn() { echo "$(date '+%Y-%m-%d %H:%M:%S') [WARN] $1" >&2; }
+    log_error() { echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $1" >&2; }
 fi
 
-# =============================================================================
-# Logging Function
-# =============================================================================
+# Initialize logging for this script
+init_logging "autostart-user" "jack-autostart-user.log"
 
-log() {
-    echo "$(date): $1" >> $LOG
-}
+# Legacy LOG variable and log() function for compatibility
+LOG=$(get_log_file)
+log() { log_info "$1"; }
 
-log "Audio Interface detected - Starting JACK directly (user context)"
+log_info "Audio Interface detected - Starting JACK directly (user context)"
 
 # =============================================================================
 # User and Session Information
@@ -37,7 +45,7 @@ log "Audio Interface detected - Starting JACK directly (user context)"
 USER=$(whoami)
 USER_ID=$(id -u)
 
-log "User: $USER (ID: $USER_ID)"
+log_info "User: $USER (ID: $USER_ID)"
 
 # =============================================================================
 # Configuration Loading
@@ -51,7 +59,7 @@ if [ -f "/etc/ai-jack/jack-setting.conf" ]; then
     CONF_TIMEOUT=$(grep -E "^DBUS_TIMEOUT=" /etc/ai-jack/jack-setting.conf 2>/dev/null | cut -d= -f2)
     if [ -n "$CONF_TIMEOUT" ]; then
         DBUS_TIMEOUT="$CONF_TIMEOUT"
-        log "Loaded DBUS_TIMEOUT=$DBUS_TIMEOUT from system config"
+        log_debug "Loaded DBUS_TIMEOUT=$DBUS_TIMEOUT from system config"
     fi
 fi
 
@@ -61,7 +69,7 @@ if [ -f "$USER_CONFIG" ]; then
     CONF_TIMEOUT=$(grep -E "^DBUS_TIMEOUT=" "$USER_CONFIG" 2>/dev/null | cut -d= -f2)
     if [ -n "$CONF_TIMEOUT" ]; then
         DBUS_TIMEOUT="$CONF_TIMEOUT"
-        log "Loaded DBUS_TIMEOUT=$DBUS_TIMEOUT from user config"
+        log_debug "Loaded DBUS_TIMEOUT=$DBUS_TIMEOUT from user config"
     fi
 fi
 
@@ -73,19 +81,19 @@ fi
 DBUS_SOCKET="/run/user/$USER_ID/bus"
 WAIT_TIME=0
 
-log "Checking DBUS socket: $DBUS_SOCKET (timeout: ${DBUS_TIMEOUT}s)"
+log_debug "Checking DBUS socket: $DBUS_SOCKET (timeout: ${DBUS_TIMEOUT}s)"
 while [ ! -e "$DBUS_SOCKET" ] && [ $WAIT_TIME -lt $DBUS_TIMEOUT ]; do
-    log "Waiting for DBUS socket... ($WAIT_TIME/${DBUS_TIMEOUT}s)"
+    log_debug "Waiting for DBUS socket... ($WAIT_TIME/${DBUS_TIMEOUT}s)"
     sleep 1
     WAIT_TIME=$((WAIT_TIME + 1))
 done
 
 if [ ! -e "$DBUS_SOCKET" ]; then
-    log "WARNING: DBUS socket not found after $DBUS_TIMEOUT seconds. Continuing anyway."
-    log "HINT: Increase DBUS_TIMEOUT in /etc/ai-jack/jack-setting.conf if this happens frequently."
+    log_warn "DBUS socket not found after $DBUS_TIMEOUT seconds. Continuing anyway."
+    log_info "HINT: Increase DBUS_TIMEOUT in /etc/ai-jack/jack-setting.conf if this happens frequently."
 fi
 
-log "Starting JACK directly for user: $USER"
+log_info "Starting JACK directly for user: $USER"
 
 # =============================================================================
 # User Context Execution
@@ -99,4 +107,4 @@ export XDG_RUNTIME_DIR=/run/user/$USER_ID
 # Execute JACK initialization script directly (we are already the correct user)
 /usr/local/bin/ai-jack-init.sh >> $LOG 2>&1
 
-log "JACK startup command completed"
+log_info "JACK startup command completed"

@@ -19,15 +19,36 @@
 ACTION="$1"
 KERNEL="$2"
 
-# Log file path - use /run/ai-jack if writable, otherwise /tmp
+# =============================================================================
+# Logging Setup
+# =============================================================================
+# Ensure log directory exists with proper permissions
 if mkdir -p /run/ai-jack 2>/dev/null; then
     chmod 777 /run/ai-jack 2>/dev/null
-    LOG="/run/ai-jack/jack-udev-handler.log"
 else
     mkdir -p /tmp/ai-jack 2>/dev/null
     chmod 777 /tmp/ai-jack 2>/dev/null
-    LOG="/tmp/ai-jack/jack-udev-handler.log"
 fi
+
+# Source centralized logging library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/ai-jack-logging.sh" ]; then
+    source "$SCRIPT_DIR/ai-jack-logging.sh"
+elif [ -f "/usr/local/bin/ai-jack-logging.sh" ]; then
+    source "/usr/local/bin/ai-jack-logging.sh"
+else
+    # Fallback: define minimal logging functions
+    log_debug() { :; }
+    log_info() { echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $1"; }
+    log_warn() { echo "$(date '+%Y-%m-%d %H:%M:%S') [WARN] $1" >&2; }
+    log_error() { echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $1" >&2; }
+fi
+
+# Initialize logging for this script
+init_logging "udev-handler" "jack-udev-handler.log"
+
+# Legacy LOG variable for compatibility
+LOG=$(get_log_file)
 
 # =============================================================================
 # Configuration Loading
@@ -63,7 +84,7 @@ any_external_audio_device_present() {
             fi
 
             # Found an external USB audio device
-            log "Found external audio device: $card_name ($card_id)"
+            log_debug "Found external audio device: $card_name ($card_id)"
             return 0
         fi
     done <<< "$aplay_output"
@@ -72,68 +93,66 @@ any_external_audio_device_present() {
 }
 
 # =============================================================================
-# Logging and Error Handling
+# Error Handling
 # =============================================================================
 
-# Logging function with error handling
-log() {
-    echo "$(date): $1" >> $LOG 2>&1
-}
+# Legacy log() function for compatibility
+log() { log_info "$1"; }
 
 # Set error trap to catch failures
 set -e
-trap 'log "ERROR: Script failed at line $LINENO"' ERR
+trap 'log_error "Script failed at line $LINENO"' ERR
 
-log "UDEV handler called: ACTION=$ACTION KERNEL=$KERNEL"
-log "DEBUG: DEVICE_PATTERN=${DEVICE_PATTERN:-<not set>}"
+log_info "UDEV handler called: ACTION=$ACTION KERNEL=$KERNEL"
+log_debug "DEVICE_PATTERN=${DEVICE_PATTERN:-<not set>}"
 
 # =============================================================================
 # Device Addition Handler (when audio interface is connected)
 # =============================================================================
 
 if [ "$ACTION" = "add" ] && [[ "$KERNEL" == controlC* ]]; then
-    log "Sound controller added, checking for audio interface..."
+    log_info "Sound controller added, checking for audio interface..."
 
     # Check for logged-in user (flexible X11 session detection)
-    log "DEBUG: Running who command..."
+    log_debug "Running who command..."
     WHO_OUTPUT=$(who 2>&1 || echo "who command failed")
-    log "DEBUG: who output: $WHO_OUTPUT"
+    log_debug "who output: $WHO_OUTPUT"
 
     # Search for any X11 display session (:0, :1, etc.)
     USER_LOGGED_IN=$(echo "$WHO_OUTPUT" | grep "(:" | head -n1 | awk '{print $1}' || echo "")
-    log "DEBUG: Found user: [$USER_LOGGED_IN]"
+    log_debug "Found user: [$USER_LOGGED_IN]"
 
     if [ -z "$USER_LOGGED_IN" ]; then
-        log "No user logged in, creating trigger file"
+        log_info "No user logged in, creating trigger file"
         touch /run/ai-jack/device-detected
-        log "DEBUG: Trigger file created"
+        log_debug "Trigger file created"
         exit 0
     fi
 
-    log "DEBUG: User is logged in, checking hardware"
+    log_debug "User is logged in, checking hardware"
     sleep 2
 
-    log "DEBUG: Running aplay -l..."
+    log_debug "Running aplay -l..."
     APLAY_OUTPUT=$(LC_ALL=C aplay -l 2>&1 || echo "aplay command failed")
-    log "DEBUG: aplay output: $APLAY_OUTPUT"
+    log_debug "aplay output: $APLAY_OUTPUT"
 
     # Check for ANY external audio device (not just the configured pattern)
     # The ai-jack-init.sh script will auto-detect and use the available device
     DEVICE_FOUND=false
     if any_external_audio_device_present; then
         DEVICE_FOUND=true
-        log "External audio interface detected"
+        log_info "External audio interface detected"
     fi
 
     if [ "$DEVICE_FOUND" = true ]; then
-        log "Audio interface found, user $USER_LOGGED_IN logged in, starting JACK"
-        log "DEBUG: Calling ai-jack-autostart.sh..."
-        /usr/local/bin/ai-jack-autostart.sh >> $LOG 2>&1 || log "ERROR: Autostart script failed"
+        log_info "Audio interface found, user $USER_LOGGED_IN logged in, starting JACK"
+        log_debug "Calling ai-jack-autostart.sh..."
+        /usr/local/bin/ai-jack-autostart.sh >> $LOG 2>&1 || log_error "Autostart script failed"
 
         # NOTE: Dynamic optimizer runs separately as system service
-        log "DEBUG: Dynamic optimizer runs independently as system service"
+        log_debug "Dynamic optimizer runs independently as system service"
     else
-        log "No external audio interface found (internal devices filtered)"
+        log_info "No external audio interface found (internal devices filtered)"
     fi
 
 # =============================================================================
@@ -141,7 +160,7 @@ if [ "$ACTION" = "add" ] && [[ "$KERNEL" == controlC* ]]; then
 # =============================================================================
 
 elif [ "$ACTION" = "remove" ] && [[ "$KERNEL" == card* ]]; then
-    log "Sound device removed, checking for audio interface..."
+    log_info "Sound device removed, checking for audio interface..."
 
     # Remove trigger file
     rm -f /run/ai-jack/device-detected 2>/dev/null
@@ -150,7 +169,7 @@ elif [ "$ACTION" = "remove" ] && [[ "$KERNEL" == card* ]]; then
     USER_LOGGED_IN=$(who | grep "(:" | head -n1 | awk '{print $1}' || echo "")
 
     if [ -z "$USER_LOGGED_IN" ]; then
-        log "No user logged in, skipping JACK check"
+        log_info "No user logged in, skipping JACK check"
         exit 0
     fi
 
@@ -158,12 +177,12 @@ elif [ "$ACTION" = "remove" ] && [[ "$KERNEL" == card* ]]; then
 
     # Check if ANY external audio device is still available
     if any_external_audio_device_present; then
-        log "Another external audio device still available, restarting JACK with new device"
-        /usr/local/bin/ai-jack-autostart.sh >> $LOG 2>&1 || log "ERROR: Autostart script failed"
+        log_info "Another external audio device still available, restarting JACK with new device"
+        /usr/local/bin/ai-jack-autostart.sh >> $LOG 2>&1 || log_error "Autostart script failed"
     else
-        log "No external audio interface remaining, user $USER_LOGGED_IN logged in, stopping JACK"
-        /usr/local/bin/ai-jack-shutdown.sh >> $LOG 2>&1 || log "ERROR: Shutdown script failed"
+        log_info "No external audio interface remaining, user $USER_LOGGED_IN logged in, stopping JACK"
+        /usr/local/bin/ai-jack-shutdown.sh >> $LOG 2>&1 || log_error "Shutdown script failed"
     fi
 fi
 
-log "UDEV handler completed"
+log_info "UDEV handler completed"

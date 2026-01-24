@@ -179,6 +179,7 @@ install_scripts() {
     echo -e "${YELLOW}Installing scripts to /usr/local/bin/...${NC}"
 
     local scripts=(
+        "ai-jack-logging.sh"
         "ai-udev-handler.sh"
         "ai-jack-autostart.sh"
         "ai-jack-autostart-user.sh"

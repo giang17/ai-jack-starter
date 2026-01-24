@@ -11,29 +11,30 @@
 # License: GPL-3.0-or-later
 # =============================================================================
 
-# Log file path - use /run/ai-jack if writable, otherwise /tmp
-if mkdir -p /run/ai-jack 2>/dev/null && [ -w /run/ai-jack ]; then
-    LOG="/run/ai-jack/jack-restart.log"
+# =============================================================================
+# Logging Setup
+# =============================================================================
+# Source centralized logging library
+SCRIPT_DIR_LOGGING="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR_LOGGING/ai-jack-logging.sh" ]; then
+    source "$SCRIPT_DIR_LOGGING/ai-jack-logging.sh"
+elif [ -f "/usr/local/bin/ai-jack-logging.sh" ]; then
+    source "/usr/local/bin/ai-jack-logging.sh"
 else
-    mkdir -p /tmp/ai-jack 2>/dev/null
-    LOG="/tmp/ai-jack/jack-restart.log"
+    # Fallback: define minimal logging functions
+    log_debug() { :; }
+    log_info() { echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $1"; }
+    log_warn() { echo "$(date '+%Y-%m-%d %H:%M:%S') [WARN] $1" >&2; }
+    log_error() { echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $1" >&2; }
+    fail() { log_error "$1"; exit 1; }
 fi
 
-# =============================================================================
-# Logging Functions
-# =============================================================================
+# Initialize logging for this script
+init_logging "restart" "jack-restart.log"
 
-# Logging function
-log() {
-    echo "$(date): $1" >> $LOG
-}
-
-# Function to exit with error message
-fail() {
-    echo "ERROR: $1"
-    log "ERROR: $1"
-    exit 1
-}
+# Legacy LOG variable and log() function for compatibility
+LOG=$(get_log_file)
+log() { log_info "$1"; }
 
 # =============================================================================
 # Script Paths
@@ -45,7 +46,7 @@ SHUTDOWN_SCRIPT="$SCRIPT_DIR/ai-jack-shutdown.sh"
 INIT_SCRIPT="$SCRIPT_DIR/ai-jack-init.sh"
 
 echo "=== Audio Interface JACK Server Restart ==="
-log "=== Audio Interface JACK Server Restart started ==="
+log_info "=== Audio Interface JACK Server Restart started ==="
 
 # =============================================================================
 # User Detection
@@ -60,13 +61,13 @@ if [ -z "$ACTIVE_USER" ]; then
 fi
 
 if [ -z "$ACTIVE_USER" ]; then
-    log "ERROR: No active user detected - cannot restart JACK"
+    log_error "No active user detected - cannot restart JACK"
     exit 1
 fi
 USER="$ACTIVE_USER"
 USER_ID=$(id -u "$USER")
 
-log "Detected user: $USER (ID: $USER_ID)"
+log_info "Detected user: $USER (ID: $USER_ID)"
 echo "Detected user: $USER"
 
 # =============================================================================
@@ -88,7 +89,7 @@ fi
 # =============================================================================
 
 echo "Phase 1: Shutting down JACK server..."
-log "Calling shutdown script: $SHUTDOWN_SCRIPT"
+log_info "Calling shutdown script: $SHUTDOWN_SCRIPT"
 bash "$SHUTDOWN_SCRIPT" || fail "Shutdown script failed"
 
 # Brief pause between shutdown and startup
@@ -100,7 +101,7 @@ sleep 2
 # =============================================================================
 
 echo "Phase 2: Starting JACK server..."
-log "Calling init script: $INIT_SCRIPT (absolute path)"
+log_info "Calling init script: $INIT_SCRIPT (absolute path)"
 echo "Using absolute path: $INIT_SCRIPT"
 
 # Execute init script as detected user with correct environment variables
@@ -112,4 +113,4 @@ bash '$INIT_SCRIPT'
 " >> $LOG 2>&1 || fail "Init script failed"
 
 echo "=== RESTART COMPLETED SUCCESSFULLY ==="
-log "=== RESTART COMPLETED SUCCESSFULLY ==="
+log_info "=== RESTART COMPLETED SUCCESSFULLY ==="
