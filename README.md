@@ -4,7 +4,7 @@ Automatic JACK audio server management for USB audio interfaces. Starts and stop
 
 ![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg)
 ![Ubuntu Studio](https://img.shields.io/badge/Ubuntu%20Studio-24.04+-orange.svg)
-![Version](https://img.shields.io/badge/version-3.0.1-green.svg)
+![Version](https://img.shields.io/badge/version-1.0.1-green.svg)
 
 ## Features
 
