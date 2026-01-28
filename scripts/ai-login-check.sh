@@ -38,17 +38,35 @@ log() { log_info "$1"; }
 log_info "Login check: Starting after boot"
 
 # =============================================================================
-# Configuration Loading
+# Auto-Detection Helper
 # =============================================================================
-SYSTEM_CONFIG_FILE="/etc/ai-jack/jack-setting.conf"
-DEVICE_PATTERN=""
+# Patterns to filter out internal/onboard audio devices
+INTERNAL_DEVICE_PATTERNS="HDA NVidia|HDA Intel|HDA ATI|HDA AMD|HDMI|sof-|PCH"
 
-# Load DEVICE_PATTERN from config if available
-if [ -f "$SYSTEM_CONFIG_FILE" ]; then
-    DEVICE_PATTERN=$(grep "^DEVICE_PATTERN=" "$SYSTEM_CONFIG_FILE" 2>/dev/null | cut -d'=' -f2 | tr -d ' ')
-fi
+# Check if any external USB audio interface is connected
+any_external_audio_device_present() {
+    local aplay_output
+    aplay_output=$(LC_ALL=C aplay -l 2>/dev/null)
 
-log_debug "Login check: DEVICE_PATTERN=${DEVICE_PATTERN:-<not set>}"
+    # Parse aplay output to find USB audio devices (exclude internal devices)
+    while IFS= read -r line; do
+        if [[ "$line" =~ ^card\ ([0-9]+):\ ([a-zA-Z0-9_]+)\ \[([^\]]+)\] ]]; then
+            local card_name="${BASH_REMATCH[3]}"
+            local card_id="${BASH_REMATCH[2]}"
+
+            # Skip internal devices
+            if echo "$card_name $card_id" | grep -qiE "$INTERNAL_DEVICE_PATTERNS"; then
+                continue
+            fi
+
+            # Found an external USB audio device
+            log_debug "Found external audio device: $card_name ($card_id)"
+            return 0
+        fi
+    done <<< "$aplay_output"
+
+    return 1
+}
 
 # =============================================================================
 # Wait for User Login
@@ -88,27 +106,14 @@ log_info "Login check: Checking for pre-connected audio interface"
 if [ -f /run/ai-jack/device-detected ]; then
     log_debug "Login check: Device trigger file found, checking hardware"
 
-    # Check if device is still actually connected
-    DEVICE_FOUND=false
-    if [ -n "$DEVICE_PATTERN" ]; then
-        if LC_ALL=C aplay -l | grep -q "$DEVICE_PATTERN"; then
-            DEVICE_FOUND=true
-            log_info "Login check: Device matching '$DEVICE_PATTERN' is connected"
-        fi
-    else
-        # No pattern - assume device is present if any sound card exists
-        if LC_ALL=C aplay -l | grep -q "card"; then
-            DEVICE_FOUND=true
-            log_info "Login check: Audio device is connected (no pattern configured)"
-        fi
-    fi
-
-    if [ "$DEVICE_FOUND" = true ]; then
-        log_info "Login check: Starting JACK"
+    # Check for ANY external audio device using auto-detection
+    # This filters out internal devices (HDA Intel, HDMI, etc.)
+    if any_external_audio_device_present; then
+        log_info "Login check: External audio interface detected, starting JACK"
         # Use user script since we are running as user
         /usr/local/bin/ai-jack-autostart-user.sh >> $LOG 2>&1
     else
-        log_warn "Login check: Audio interface no longer connected"
+        log_warn "Login check: No external audio interface found (internal devices filtered)"
     fi
 
     # Remove trigger file
