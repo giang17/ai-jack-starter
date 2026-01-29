@@ -373,32 +373,60 @@ auto_detect_device() {
 # Hardware Check and Auto-Detection
 # =============================================================================
 
-# ALWAYS auto-detect the currently available device
-# This ensures hotplug works correctly when switching between devices
-# The config file is only used for audio parameters (rate, period, nperiods)
+# Check if configured device is available, otherwise auto-detect
+# This respects manual device selection while still supporting hotplug
 
-log "Auto-detecting available audio interface..."
-detected_device=$(auto_detect_device)
+check_device_available() {
+    local device="$1"
+    # Extract card_id from device (e.g., "M4" from "hw:M4,0")
+    local card_id
+    card_id=$(echo "$device" | sed -n 's/hw:\([^,]*\).*/\1/p')
 
-if [ -n "$detected_device" ]; then
-    # Extract card_id for pattern
-    detected_card_id=$(echo "$detected_device" | sed -n 's/hw:\([^,]*\).*/\1/p')
-
-    if [ "$detected_device" != "$ACTIVE_AUDIO_DEVICE" ]; then
-        log "Auto-detected audio device: $detected_device (config had: $ACTIVE_AUDIO_DEVICE)"
-        echo "Auto-detected audio device: $detected_device"
-    else
-        log "Using configured audio device: $detected_device"
+    if [ -z "$card_id" ]; then
+        return 1
     fi
 
-    ACTIVE_AUDIO_DEVICE="$detected_device"
-    ACTIVE_DEVICE_PATTERN="$detected_card_id"
+    # Check if this card exists in aplay output
+    LC_ALL=C aplay -l 2>/dev/null | grep -q "card.*: $card_id "
+}
 
-    # Recalculate description
-    ACTIVE_DESC="Custom (${ACTIVE_RATE}Hz, ${ACTIVE_NPERIODS}x${ACTIVE_PERIOD}, ~${LATENCY_MS}ms)"
+log "Auto-detecting available audio interface..."
+
+# First, check if the configured device is available
+if [ -n "$ACTIVE_AUDIO_DEVICE" ] && [ "$ACTIVE_AUDIO_DEVICE" != "$DEFAULT_AUDIO_DEVICE" ]; then
+    if check_device_available "$ACTIVE_AUDIO_DEVICE"; then
+        log "Using configured audio device: $ACTIVE_AUDIO_DEVICE"
+        echo "Using configured audio device: $ACTIVE_AUDIO_DEVICE"
+    else
+        # Configured device not available, fall back to auto-detection
+        log_warn "Configured device $ACTIVE_AUDIO_DEVICE not available, auto-detecting..."
+        detected_device=$(auto_detect_device)
+        if [ -n "$detected_device" ]; then
+            log "Auto-detected audio device: $detected_device (config had: $ACTIVE_AUDIO_DEVICE)"
+            echo "Auto-detected audio device: $detected_device"
+            ACTIVE_AUDIO_DEVICE="$detected_device"
+            # Extract card_id for pattern
+            ACTIVE_DEVICE_PATTERN=$(echo "$detected_device" | sed -n 's/hw:\([^,]*\).*/\1/p')
+        else
+            fail "No audio interface found. Please connect a USB audio device."
+        fi
+    fi
 else
-    fail "No audio interface found. Please connect a USB audio device."
+    # No specific device configured, use auto-detection
+    detected_device=$(auto_detect_device)
+    if [ -n "$detected_device" ]; then
+        log "Auto-detected audio device: $detected_device"
+        echo "Using auto-detected audio device: $detected_device"
+        ACTIVE_AUDIO_DEVICE="$detected_device"
+        # Extract card_id for pattern
+        ACTIVE_DEVICE_PATTERN=$(echo "$detected_device" | sed -n 's/hw:\([^,]*\).*/\1/p')
+    else
+        fail "No audio interface found. Please connect a USB audio device."
+    fi
 fi
+
+# Recalculate description
+ACTIVE_DESC="Custom (${ACTIVE_RATE}Hz, ${ACTIVE_NPERIODS}x${ACTIVE_PERIOD}, ~${LATENCY_MS}ms)"
 
 # =============================================================================
 # JACK Control Helper Functions (DBus Error Handling)
