@@ -396,7 +396,7 @@ cleanup_old_installation() {
     local old_files_found=false
 
     # Check for old scripts
-    if ls /usr/local/bin/motu-m4-* 2>/dev/null | head -1 > /dev/null; then
+    if compgen -G "/usr/local/bin/motu-m4-*" > /dev/null 2>&1; then
         old_files_found=true
     fi
 
