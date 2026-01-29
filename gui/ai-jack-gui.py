@@ -656,11 +656,33 @@ class AudioInterfaceJackGUI(Gtk.Window):
 
         self.previous_hardware_found = bool(self.detected_devices)
 
-        # Show the actually connected device (first in list if available)
-        if self.detected_devices:
+        # Current config display - read from config file
+        config = self.read_current_config()
+        config_device = config.get("audio_device", "")
+
+        # Show the configured device and its connection status
+        if config_device:
+            # Check if configured device is available
+            device_available = any(dev["id"] == config_device for dev in self.detected_devices)
+            if device_available:
+                # Find device name for display
+                device_name = config_device
+                for dev in self.detected_devices:
+                    if dev["id"] == config_device:
+                        device_name = dev.get("name", config_device)
+                        break
+                self.hardware_status_label.set_markup(
+                    f"Audio Device: <span foreground='{self.color_success}'><b>{device_name}</b></span> ({config_device})"
+                )
+            else:
+                self.hardware_status_label.set_markup(
+                    f"Audio Device: <span foreground='{self.color_error}'><b>Not connected</b></span> ({config_device})"
+                )
+        elif self.detected_devices:
+            # No specific device configured, show first available
             connected_device = self.detected_devices[0]
             self.hardware_status_label.set_markup(
-                f"Audio Device: <span foreground='{self.color_success}'><b>Connected</b></span> ({connected_device['id']})"
+                f"Audio Device: <span foreground='{self.color_success}'><b>{connected_device['name']}</b></span> ({connected_device['id']})"
             )
         else:
             self.hardware_status_label.set_markup(
@@ -677,9 +699,6 @@ class AudioInterfaceJackGUI(Gtk.Window):
             self.a2j_status_label.set_markup(
                 f"<small><span foreground='{self.color_error}'>(stopped)</span></small>"
             )
-
-        # Current config display - read from config file
-        config = self.read_current_config()
         rate = config.get("rate", 48000)
         period = config.get("period", 256)
         nperiods = config.get("nperiods", 3)
