@@ -453,6 +453,9 @@ class AudioInterfaceJackGUI(Gtk.Window):
 
     def refresh_audio_devices(self):
         """Detect and populate audio devices from aplay -l (filters internal devices)"""
+        # Remember currently selected device to restore after refresh
+        previously_selected = self.get_selected_device()
+
         self.detected_devices = []
         self.device_combo.remove_all()
 
@@ -492,10 +495,18 @@ class AudioInterfaceJackGUI(Gtk.Window):
                     })
                     self.device_combo.append_text(display_name)
 
-            # Select first device
+            # Restore previous selection if still available, otherwise select first
             if self.detected_devices:
                 self.updating_ui = True
-                self.device_combo.set_active(0)
+                restored = False
+                if previously_selected:
+                    for i, dev in enumerate(self.detected_devices):
+                        if dev["id"] == previously_selected:
+                            self.device_combo.set_active(i)
+                            restored = True
+                            break
+                if not restored:
+                    self.device_combo.set_active(0)
                 self.updating_ui = False
 
             logger.info("Detected %d audio devices", len(self.detected_devices))
@@ -752,11 +763,19 @@ class AudioInterfaceJackGUI(Gtk.Window):
 
         self.updating_ui = True
 
-        # Select first available device (auto-detect behavior)
+        # Select device from config if available, otherwise first device
         if self.detected_devices:
-            self.device_combo.set_active(0)
+            selected = False
+            config_device = config.get("audio_device", "")
+            if config_device:
+                for i, dev in enumerate(self.detected_devices):
+                    if dev["id"] == config_device:
+                        self.device_combo.set_active(i)
+                        selected = True
+                        break
+            if not selected:
+                self.device_combo.set_active(0)
 
-        # Load pattern from config (user can modify for manual override)
         # Set rate
         if config["rate"] in self.SAMPLE_RATES:
             self.rate_combo.set_active(self.SAMPLE_RATES.index(config["rate"]))
