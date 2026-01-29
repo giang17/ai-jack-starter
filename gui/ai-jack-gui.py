@@ -64,7 +64,7 @@ class AudioInterfaceJackGUI(Gtk.Window):
 
     # Presets (for quick selection) - ordered by latency: Ultra -> Low -> Medium
     PRESETS = {
-        "ultra": {"name": "Ultra-Low", "rate": 48000, "period": 64, "nperiods": 2},
+        "ultra": {"name": "Ultra-Low", "rate": 48000, "period": 64, "nperiods": 3},
         "low": {"name": "Low Latency", "rate": 48000, "period": 128, "nperiods": 2},
         "medium": {
             "name": "Medium Latency",
