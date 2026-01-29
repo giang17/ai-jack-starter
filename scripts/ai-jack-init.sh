@@ -401,16 +401,79 @@ else
 fi
 
 # =============================================================================
+# JACK Control Helper Functions (DBus Error Handling)
+# =============================================================================
+
+# Maximum retries for DBus connection
+DBUS_MAX_RETRIES=3
+DBUS_RETRY_DELAY=2
+
+# Helper function to safely call jack_control (handles DBus errors at early boot)
+safe_jack_control() {
+    local cmd="$1"
+    shift
+    local args=("$@")
+    local retry=0
+    local result
+    local exit_code
+
+    while [ $retry -lt $DBUS_MAX_RETRIES ]; do
+        result=$(jack_control "$cmd" "${args[@]}" 2>&1)
+        exit_code=$?
+
+        # Check for DBus errors
+        if echo "$result" | grep -qi "dbus\|autolaunch\|org.freedesktop.DBus.Error"; then
+            retry=$((retry + 1))
+            if [ $retry -lt $DBUS_MAX_RETRIES ]; then
+                log_warn "jack_control $cmd failed - DBus not available (attempt $retry/$DBUS_MAX_RETRIES)"
+                log_debug "DBus error: $result"
+                sleep $DBUS_RETRY_DELAY
+                continue
+            else
+                log_error "jack_control $cmd failed after $DBUS_MAX_RETRIES attempts - DBus not available"
+                log_error "DBus error: $result"
+                echo "Error: jack_control $cmd unavailable (DBus not ready after $DBUS_MAX_RETRIES attempts)"
+                return 1
+            fi
+        fi
+
+        # Success or non-DBus error
+        if [ $exit_code -eq 0 ]; then
+            echo "$result"
+            return 0
+        else
+            log_warn "jack_control $cmd returned $exit_code: $result"
+            echo "$result"
+            return $exit_code
+        fi
+    done
+
+    return 1
+}
+
+# Helper function to check if JACK is running (handles DBus errors)
+check_jack_running() {
+    local status
+    status=$(safe_jack_control status 2>&1)
+
+    # Check if we got a valid response indicating JACK is started
+    if echo "$status" | grep -qi "started"; then
+        return 0
+    fi
+    return 1
+}
+
+# =============================================================================
 # JACK Configuration and Start
 # =============================================================================
 
 # Check JACK status and stop if running
 echo "Checking JACK status..."
 log "Checking JACK status..."
-if jack_control status 2>/dev/null | grep -q "started"; then
+if check_jack_running; then
     echo "JACK is running - stopping for parameter configuration..."
     log "JACK is running - stopping for parameter configuration..."
-    jack_control stop
+    safe_jack_control stop
     sleep 1
 fi
 
@@ -419,19 +482,26 @@ echo "Configuring JACK with $ACTIVE_DESC..."
 echo "Using audio device: $ACTIVE_AUDIO_DEVICE"
 log "Configuring JACK: Device=$ACTIVE_AUDIO_DEVICE, Rate=$ACTIVE_RATE, Periods=$ACTIVE_NPERIODS, Period=$ACTIVE_PERIOD"
 
-jack_control ds alsa
-jack_control dps device "$ACTIVE_AUDIO_DEVICE"
-jack_control dps rate "$ACTIVE_RATE"
-jack_control dps nperiods "$ACTIVE_NPERIODS"
-jack_control dps period "$ACTIVE_PERIOD"
+safe_jack_control ds alsa || log_warn "Failed to set JACK driver to ALSA"
+safe_jack_control dps device "$ACTIVE_AUDIO_DEVICE" || log_warn "Failed to set JACK device"
+safe_jack_control dps rate "$ACTIVE_RATE" || log_warn "Failed to set JACK sample rate"
+safe_jack_control dps nperiods "$ACTIVE_NPERIODS" || log_warn "Failed to set JACK nperiods"
+safe_jack_control dps period "$ACTIVE_PERIOD" || log_warn "Failed to set JACK period"
 
 # Start JACK
 echo "Starting JACK server with new parameters..."
 log "Starting JACK server..."
-jack_control start || fail "JACK server could not be started"
+if ! safe_jack_control start; then
+    log_error "JACK server could not be started via DBus"
+    fail "JACK server could not be started (DBus communication failed)"
+fi
 
 # Verify status
-jack_control status || fail "JACK server is not running correctly"
+if ! check_jack_running; then
+    log_error "JACK server is not running after start command"
+    fail "JACK server is not running correctly"
+fi
+log_info "JACK server started successfully"
 
 # =============================================================================
 # A2J MIDI Bridge (Optional)
