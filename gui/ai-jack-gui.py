@@ -64,7 +64,7 @@ class AudioInterfaceJackGUI(Gtk.Window):
 
     # Presets (for quick selection) - ordered by latency: Ultra -> Low -> Medium
     PRESETS = {
-        "ultra": {"name": "Ultra-Low", "rate": 48000, "period": 64, "nperiods": 2},
+        "ultra": {"name": "Ultra-Low", "rate": 48000, "period": 64, "nperiods": 3},
         "low": {"name": "Low Latency", "rate": 48000, "period": 128, "nperiods": 2},
         "medium": {
             "name": "Medium Latency",
@@ -453,6 +453,9 @@ class AudioInterfaceJackGUI(Gtk.Window):
 
     def refresh_audio_devices(self):
         """Detect and populate audio devices from aplay -l (filters internal devices)"""
+        # Remember currently selected device to restore after refresh
+        previously_selected = self.get_selected_device()
+
         self.detected_devices = []
         self.device_combo.remove_all()
 
@@ -492,10 +495,18 @@ class AudioInterfaceJackGUI(Gtk.Window):
                     })
                     self.device_combo.append_text(display_name)
 
-            # Select first device
+            # Restore previous selection if still available, otherwise select first
             if self.detected_devices:
                 self.updating_ui = True
-                self.device_combo.set_active(0)
+                restored = False
+                if previously_selected:
+                    for i, dev in enumerate(self.detected_devices):
+                        if dev["id"] == previously_selected:
+                            self.device_combo.set_active(i)
+                            restored = True
+                            break
+                if not restored:
+                    self.device_combo.set_active(0)
                 self.updating_ui = False
 
             logger.info("Detected %d audio devices", len(self.detected_devices))
@@ -645,11 +656,33 @@ class AudioInterfaceJackGUI(Gtk.Window):
 
         self.previous_hardware_found = bool(self.detected_devices)
 
-        # Show the actually connected device (first in list if available)
-        if self.detected_devices:
+        # Current config display - read from config file
+        config = self.read_current_config()
+        config_device = config.get("audio_device", "")
+
+        # Show the configured device and its connection status
+        if config_device:
+            # Check if configured device is available
+            device_available = any(dev["id"] == config_device for dev in self.detected_devices)
+            if device_available:
+                # Find device name for display
+                device_name = config_device
+                for dev in self.detected_devices:
+                    if dev["id"] == config_device:
+                        device_name = dev.get("name", config_device)
+                        break
+                self.hardware_status_label.set_markup(
+                    f"Audio Device: <span foreground='{self.color_success}'><b>{device_name}</b></span> ({config_device})"
+                )
+            else:
+                self.hardware_status_label.set_markup(
+                    f"Audio Device: <span foreground='{self.color_error}'><b>Not connected</b></span> ({config_device})"
+                )
+        elif self.detected_devices:
+            # No specific device configured, show first available
             connected_device = self.detected_devices[0]
             self.hardware_status_label.set_markup(
-                f"Audio Device: <span foreground='{self.color_success}'><b>Connected</b></span> ({connected_device['id']})"
+                f"Audio Device: <span foreground='{self.color_success}'><b>{connected_device['name']}</b></span> ({connected_device['id']})"
             )
         else:
             self.hardware_status_label.set_markup(
@@ -666,9 +699,6 @@ class AudioInterfaceJackGUI(Gtk.Window):
             self.a2j_status_label.set_markup(
                 f"<small><span foreground='{self.color_error}'>(stopped)</span></small>"
             )
-
-        # Current config display - read from config file
-        config = self.read_current_config()
         rate = config.get("rate", 48000)
         period = config.get("period", 256)
         nperiods = config.get("nperiods", 3)
@@ -752,11 +782,19 @@ class AudioInterfaceJackGUI(Gtk.Window):
 
         self.updating_ui = True
 
-        # Select first available device (auto-detect behavior)
+        # Select device from config if available, otherwise first device
         if self.detected_devices:
-            self.device_combo.set_active(0)
+            selected = False
+            config_device = config.get("audio_device", "")
+            if config_device:
+                for i, dev in enumerate(self.detected_devices):
+                    if dev["id"] == config_device:
+                        self.device_combo.set_active(i)
+                        selected = True
+                        break
+            if not selected:
+                self.device_combo.set_active(0)
 
-        # Load pattern from config (user can modify for manual override)
         # Set rate
         if config["rate"] in self.SAMPLE_RATES:
             self.rate_combo.set_active(self.SAMPLE_RATES.index(config["rate"]))
