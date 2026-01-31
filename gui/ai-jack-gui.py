@@ -369,6 +369,7 @@ class AudioInterfaceJackGUI(Gtk.Window):
         self.color_error = "#c01c28"  # Red
         self.color_warning = "#e5a50a"  # Orange/Yellow
         self.color_accent = "#3584e4"  # Blue
+        self.color_muted = "#888888"  # Gray for disabled/inactive states
 
         # Try to detect dark theme and adjust colors for better visibility
         settings = Gtk.Settings.get_default()
@@ -385,6 +386,7 @@ class AudioInterfaceJackGUI(Gtk.Window):
                 self.color_error = "#f66151"  # Brighter red
                 self.color_warning = "#f8e45c"  # Brighter yellow
                 self.color_accent = "#62a0ea"  # Brighter blue
+                self.color_muted = "#999999"  # Lighter gray for dark themes
 
         # Try to get actual theme colors via CSS lookup
         try:
@@ -399,11 +401,15 @@ class AudioInterfaceJackGUI(Gtk.Window):
                 self.color_error = self._rgba_to_hex(rgba_error)
                 logger.debug("Using theme error color: %s", self.color_error)
         except AttributeError as e:
-            logger.warning("GTK theme color lookup failed (missing attributes): %s", str(e))
+            logger.warning(
+                "GTK theme color lookup failed (missing attributes): %s", str(e)
+            )
         except TypeError as e:
             logger.warning("GTK theme color lookup failed (type error): %s", str(e))
         except Exception as e:
-            logger.warning("Unexpected error looking up theme colors: %s", type(e).__name__)
+            logger.warning(
+                "Unexpected error looking up theme colors: %s", type(e).__name__
+            )
 
     def _rgba_to_hex(self, rgba):
         """Convert Gdk.RGBA to hex color string"""
@@ -440,7 +446,7 @@ class AudioInterfaceJackGUI(Gtk.Window):
         "HDA AMD",
         "HDMI",
         "sof-",  # Intel SOF (Sound Open Firmware)
-        "PCH",   # Intel Platform Controller Hub
+        "PCH",  # Intel Platform Controller Hub
     ]
 
     def is_internal_device(self, card_name, card_id):
@@ -481,18 +487,22 @@ class AudioInterfaceJackGUI(Gtk.Window):
 
                     # Skip internal/onboard devices
                     if self.is_internal_device(card_name, card_id):
-                        logger.debug("Skipping internal device: %s [%s]", card_name, card_id)
+                        logger.debug(
+                            "Skipping internal device: %s [%s]", card_name, card_id
+                        )
                         continue
 
                     device_id = f"hw:{card_id},{device_num}"
                     display_name = f"{card_name} ({device_id})"
 
-                    self.detected_devices.append({
-                        "id": device_id,
-                        "name": card_name,
-                        "card_id": card_id,
-                        "display": display_name
-                    })
+                    self.detected_devices.append(
+                        {
+                            "id": device_id,
+                            "name": card_name,
+                            "card_id": card_id,
+                            "display": display_name,
+                        }
+                    )
                     self.device_combo.append_text(display_name)
 
             # Restore previous selection if still available, otherwise select first
@@ -663,7 +673,9 @@ class AudioInterfaceJackGUI(Gtk.Window):
         # Show the configured device and its connection status
         if config_device:
             # Check if configured device is available
-            device_available = any(dev["id"] == config_device for dev in self.detected_devices)
+            device_available = any(
+                dev["id"] == config_device for dev in self.detected_devices
+            )
             if device_available:
                 # Find device name for display
                 device_name = config_device
@@ -689,15 +701,21 @@ class AudioInterfaceJackGUI(Gtk.Window):
                 f"Audio Device: <span foreground='{self.color_error}'><b>Not found</b></span>"
             )
 
-        # A2J Status indicator
-        a2j_running = self.check_a2j_status()
-        if a2j_running:
-            self.a2j_status_label.set_markup(
-                f"<small><span foreground='{self.color_success}'>(running)</span></small>"
-            )
+        # A2J Status indicator - only check if a2j is enabled in config
+        # to prevent unwanted D-Bus activation of a2jmidid
+        if config.get("a2j_enable", False):
+            a2j_running = self.check_a2j_status()
+            if a2j_running:
+                self.a2j_status_label.set_markup(
+                    f"<small><span foreground='{self.color_success}'>(running)</span></small>"
+                )
+            else:
+                self.a2j_status_label.set_markup(
+                    f"<small><span foreground='{self.color_error}'>(stopped)</span></small>"
+                )
         else:
             self.a2j_status_label.set_markup(
-                f"<small><span foreground='{self.color_error}'>(stopped)</span></small>"
+                f"<small><span foreground='{self.color_muted}'>(disabled)</span></small>"
             )
         rate = config.get("rate", 48000)
         period = config.get("period", 256)
@@ -721,7 +739,7 @@ class AudioInterfaceJackGUI(Gtk.Window):
             "rate": 48000,
             "period": 256,
             "nperiods": 3,
-            "a2j_enable": False
+            "a2j_enable": False,
         }
 
         # Try user config first, then system config
@@ -738,7 +756,9 @@ class AudioInterfaceJackGUI(Gtk.Window):
                                 if line.startswith("AUDIO_DEVICE="):
                                     config["audio_device"] = line.split("=")[1].strip()
                                 elif line.startswith("DEVICE_PATTERN="):
-                                    config["device_pattern"] = line.split("=")[1].strip()
+                                    config["device_pattern"] = line.split("=")[
+                                        1
+                                    ].strip()
                                 elif line.startswith("JACK_RATE="):
                                     config["rate"] = int(line.split("=")[1].strip())
                                 elif line.startswith("JACK_PERIOD="):
@@ -762,17 +782,27 @@ class AudioInterfaceJackGUI(Gtk.Window):
                                         config["period"] = preset["period"]
                                         config["nperiods"] = preset["nperiods"]
                             except ValueError as e:
-                                logger.warning("Failed to parse config line '%s': %s", line, str(e))
+                                logger.warning(
+                                    "Failed to parse config line '%s': %s", line, str(e)
+                                )
                                 continue
                         break  # Use first found config
                 except FileNotFoundError:
                     logger.warning("Config file not found: %s", config_file)
                 except PermissionError:
-                    logger.error("Permission denied reading config file: %s", config_file)
+                    logger.error(
+                        "Permission denied reading config file: %s", config_file
+                    )
                 except IOError as e:
-                    logger.error("I/O error reading config file %s: %s", config_file, str(e))
+                    logger.error(
+                        "I/O error reading config file %s: %s", config_file, str(e)
+                    )
                 except Exception as e:
-                    logger.exception("Unexpected error reading config from %s: %s", config_file, type(e).__name__)
+                    logger.exception(
+                        "Unexpected error reading config from %s: %s",
+                        config_file,
+                        type(e).__name__,
+                    )
 
         return config
 
@@ -819,9 +849,7 @@ class AudioInterfaceJackGUI(Gtk.Window):
             )
             # Check for DBus errors (can happen at early boot)
             if "dbus" in result.stderr.lower() or "autolaunch" in result.stderr.lower():
-                logger.warning(
-                    "DBus error in a2j_control: %s", result.stderr.strip()
-                )
+                logger.warning("DBus error in a2j_control: %s", result.stderr.strip())
                 return False
             # Check for "Bridging enabled" (not "bridge is running")
             return "bridging enabled" in result.stdout.lower()
@@ -829,13 +857,19 @@ class AudioInterfaceJackGUI(Gtk.Window):
             logger.error("a2j_control --status timed out after 5 seconds")
             return False
         except FileNotFoundError:
-            logger.error("a2j_control command not found - a2jmidid may not be installed")
+            logger.error(
+                "a2j_control command not found - a2jmidid may not be installed"
+            )
             return False
         except subprocess.CalledProcessError as e:
-            logger.error("a2j_control failed with return code %d: %s", e.returncode, e.stderr)
+            logger.error(
+                "a2j_control failed with return code %d: %s", e.returncode, e.stderr
+            )
             return False
         except Exception as e:
-            logger.exception("Unexpected error checking a2j status: %s", type(e).__name__)
+            logger.exception(
+                "Unexpected error checking a2j status: %s", type(e).__name__
+            )
             return False
 
     def check_jack_status(self):
@@ -846,9 +880,7 @@ class AudioInterfaceJackGUI(Gtk.Window):
             )
             # Check for DBus errors (can happen at early boot)
             if "dbus" in result.stderr.lower() or "autolaunch" in result.stderr.lower():
-                logger.warning(
-                    "DBus error in jack_control: %s", result.stderr.strip()
-                )
+                logger.warning("DBus error in jack_control: %s", result.stderr.strip())
                 return False
             return "started" in result.stdout.lower()
         except subprocess.TimeoutExpired:
@@ -858,10 +890,14 @@ class AudioInterfaceJackGUI(Gtk.Window):
             logger.error("jack_control command not found - JACK may not be installed")
             return False
         except subprocess.CalledProcessError as e:
-            logger.error("jack_control failed with return code %d: %s", e.returncode, e.stderr)
+            logger.error(
+                "jack_control failed with return code %d: %s", e.returncode, e.stderr
+            )
             return False
         except Exception as e:
-            logger.exception("Unexpected error checking JACK status: %s", type(e).__name__)
+            logger.exception(
+                "Unexpected error checking JACK status: %s", type(e).__name__
+            )
             return False
 
     def check_hardware(self, pattern="", device=""):
@@ -881,7 +917,10 @@ class AudioInterfaceJackGUI(Gtk.Window):
                 if match:
                     card_name = match.group(1)
                     # Check if this specific card exists in aplay output
-                    return f"card {card_name}" in result.stdout or f": {card_name} [" in result.stdout
+                    return (
+                        f"card {card_name}" in result.stdout
+                        or f": {card_name} [" in result.stdout
+                    )
             # Fallback: check if any sound card exists
             return "card" in result.stdout.lower()
         except subprocess.TimeoutExpired:
@@ -953,8 +992,15 @@ class AudioInterfaceJackGUI(Gtk.Window):
             if restart:
                 cmd.append("--restart")
 
-            logger.info("Applying settings: device=%s, rate=%d, period=%d, nperiods=%d, a2j=%s, restart=%s",
-                       device, rate, period, nperiods, a2j_value, restart)
+            logger.info(
+                "Applying settings: device=%s, rate=%d, period=%d, nperiods=%d, a2j=%s, restart=%s",
+                device,
+                rate,
+                period,
+                nperiods,
+                a2j_value,
+                restart,
+            )
 
             # Execute script
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
@@ -980,7 +1026,9 @@ class AudioInterfaceJackGUI(Gtk.Window):
             logger.error(error_msg)
             GLib.idle_add(self.on_apply_complete, False, error_msg)
         except subprocess.CalledProcessError as e:
-            error_msg = f"pkexec authorization failed or script error (code {e.returncode})"
+            error_msg = (
+                f"pkexec authorization failed or script error (code {e.returncode})"
+            )
             logger.error("Settings application failed: %s - %s", error_msg, e.stderr)
             GLib.idle_add(self.on_apply_complete, False, error_msg)
         except PermissionError:
@@ -988,7 +1036,9 @@ class AudioInterfaceJackGUI(Gtk.Window):
             logger.error(error_msg)
             GLib.idle_add(self.on_apply_complete, False, error_msg)
         except Exception as e:
-            error_msg = f"Unexpected error applying settings: {type(e).__name__}: {str(e)}"
+            error_msg = (
+                f"Unexpected error applying settings: {type(e).__name__}: {str(e)}"
+            )
             logger.exception(error_msg)
             GLib.idle_add(self.on_apply_complete, False, error_msg)
 
