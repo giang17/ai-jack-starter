@@ -62,9 +62,10 @@ export XDG_RUNTIME_DIR=/run/user/$USER_ID
 # Stop JACK and A2J cleanly
 runuser -l "$USER" -c "
 # First stop A2J MIDI Bridge cleanly (if running)
-if a2j_control --status 2>/dev/null | grep -q 'bridge is running'; then
-    echo 'Stopping A2J MIDI Bridge cleanly...'
-    a2j_control --stop 2>/dev/null || true
+# Use pgrep instead of a2j_control to avoid DBus activation issues
+if pgrep -x a2jmidid >/dev/null 2>&1; then
+    echo 'Stopping A2J MIDI Bridge...'
+    killall a2jmidid 2>/dev/null || true
     sleep 1
 fi
 
