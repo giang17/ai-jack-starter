@@ -615,14 +615,13 @@ else
     echo "A2J MIDI Bridge disabled (A2J_ENABLE=false)"
     log "A2J MIDI Bridge disabled by configuration"
 
-    # Stop a2j if it's running (handles DBus errors)
-    if check_a2j_bridge_active || pgrep -x "a2jmidid" > /dev/null 2>&1; then
+    # Stop a2j if it's running - only check via pgrep to avoid DBus calls when A2J disabled
+    if pgrep -x "a2jmidid" > /dev/null 2>&1; then
         echo "Stopping existing A2J MIDI Bridge..."
         log "Stopping A2J MIDI Bridge as it's disabled in config"
-        if ! safe_a2j_control --stop; then
-            # Fallback: use killall if a2j_control fails
-            killall a2jmidid 2>/dev/null || true
-        fi
+        # Use killall directly to avoid DBus issues at early boot
+        killall a2jmidid 2>/dev/null || true
+        sleep 1
     fi
 fi
 
