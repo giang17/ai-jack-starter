@@ -41,8 +41,11 @@ log_info "Audio Interface detected - Starting JACK directly"
 # User Detection
 # =============================================================================
 
-# Dynamic detection of active user (flexible X11 session detection)
-ACTIVE_USER=$(who | grep "(:" | head -n1 | awk '{print $1}')
+# Dynamic detection of active user and display (flexible X11 session detection)
+ACTIVE_SESSION=$(who | grep "(:" | head -n1)
+ACTIVE_USER=$(echo "$ACTIVE_SESSION" | awk '{print $1}')
+ACTIVE_DISPLAY=$(echo "$ACTIVE_SESSION" | grep -oP '\(:\K[0-9]+' | head -1)
+ACTIVE_DISPLAY=":${ACTIVE_DISPLAY:-0}"
 
 # Fallback: If no active user detected, exit script
 if [ -z "$ACTIVE_USER" ]; then
@@ -51,7 +54,7 @@ if [ -z "$ACTIVE_USER" ]; then
 fi
 USER="$ACTIVE_USER"
 
-log_info "Detected active user: $USER"
+log_info "Detected active user: $USER (DISPLAY=$ACTIVE_DISPLAY)"
 
 USER_ID=$(id -u "$USER")
 USER_HOME=$(getent passwd "$USER" | cut -d: -f6)
@@ -130,7 +133,7 @@ log_info "Starting JACK directly for user: $USER (ID: $USER_ID)"
 # =============================================================================
 
 # Set environment variables for user context
-export DISPLAY=:1
+export DISPLAY=$ACTIVE_DISPLAY
 export DBUS_SESSION_BUS_ADDRESS=unix:path=$DBUS_SOCKET
 export XDG_RUNTIME_DIR=/run/user/$USER_ID
 export HOME=$USER_HOME

@@ -52,8 +52,11 @@ log_info "=== Audio Interface JACK Server Restart started ==="
 # User Detection
 # =============================================================================
 
-# Dynamic detection of active user (same as shutdown script)
-ACTIVE_USER=$(who | grep "(:" | head -n1 | awk '{print $1}')
+# Dynamic detection of active user and display
+ACTIVE_SESSION=$(who | grep "(:" | head -n1)
+ACTIVE_USER=$(echo "$ACTIVE_SESSION" | awk '{print $1}')
+ACTIVE_DISPLAY=$(echo "$ACTIVE_SESSION" | grep -oP '\(:\K[0-9]+' | head -1)
+ACTIVE_DISPLAY=":${ACTIVE_DISPLAY:-0}"
 
 # Fallback: If no active user detected, try SUDO_USER
 if [ -z "$ACTIVE_USER" ]; then
@@ -106,7 +109,7 @@ echo "Using absolute path: $INIT_SCRIPT"
 
 # Execute init script as detected user with correct environment variables
 runuser -l "$USER" -c "
-export DISPLAY=:1
+export DISPLAY=$ACTIVE_DISPLAY
 export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$USER_ID/bus
 export XDG_RUNTIME_DIR=/run/user/$USER_ID
 bash '$INIT_SCRIPT'

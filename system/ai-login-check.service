@@ -9,7 +9,6 @@ Type=oneshot
 ExecStartPre=/bin/sleep 10
 ExecStart=/usr/local/bin/ai-login-check.sh
 RemainAfterExit=no
-Environment=DISPLAY=:1
 
 [Install]
 WantedBy=default.target

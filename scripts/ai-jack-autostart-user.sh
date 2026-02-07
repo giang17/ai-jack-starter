@@ -99,8 +99,10 @@ log_info "Starting JACK directly for user: $USER"
 # User Context Execution
 # =============================================================================
 
-# Set environment variables
-export DISPLAY=:1
+# Detect active display from session
+ACTIVE_DISPLAY=$(who | grep "^$(whoami).*(:.*)" | head -n1 | grep -oP '\(:\K[0-9]+' | head -1)
+export DISPLAY=":${ACTIVE_DISPLAY:-0}"
+log_debug "Detected DISPLAY=$DISPLAY"
 export DBUS_SESSION_BUS_ADDRESS=unix:path=$DBUS_SOCKET
 export XDG_RUNTIME_DIR=/run/user/$USER_ID
 
