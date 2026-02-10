@@ -366,6 +366,44 @@ install_systemd_service() {
     fi
 }
 
+# Cleanup old PipeWire/DBus overrides and configure compatibility
+install_pipewire_override() {
+    echo ""
+    echo -e "${YELLOW}Configuring PipeWire compatibility...${NC}"
+
+    local actual_user
+    actual_user=$(get_actual_user)
+
+    if [ -z "$actual_user" ]; then
+        return
+    fi
+
+    # Check if PipeWire is installed
+    if ! command -v pipewire &> /dev/null; then
+        echo -e "  ${BLUE}Info:${NC} PipeWire not installed - skipping"
+        return
+    fi
+
+    local user_home
+    user_home=$(eval echo ~"$actual_user")
+
+    # Cleanup old overrides from previous versions
+    local old_dbus_override="$user_home/.local/share/dbus-1/services/org.jackaudio.service"
+    if [ -f "$old_dbus_override" ]; then
+        rm -f "$old_dbus_override"
+        echo -e "  ${GREEN}✓${NC} Removed old DBus override"
+    fi
+
+    local old_pipewire_override="$user_home/.config/pipewire/pipewire.conf.d/disable-jackdbus-detect.conf"
+    if [ -f "$old_pipewire_override" ]; then
+        rm -f "$old_pipewire_override"
+        echo -e "  ${GREEN}✓${NC} Removed old PipeWire override"
+    fi
+
+    echo -e "  ${GREEN}✓${NC} PipeWire JACK tunnel managed by ai-jack-starter"
+    echo -e "  ${BLUE}Info:${NC} PipeWire is restarted after JACK start to connect audio tunnel"
+}
+
 # Check audio group membership
 check_audio_group() {
     echo ""
@@ -498,6 +536,7 @@ main() {
     install_config
     install_polkit
     install_systemd_service
+    install_pipewire_override
     check_audio_group
     print_summary
 }
