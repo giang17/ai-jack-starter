@@ -640,3 +640,15 @@ echo "  A2J MIDI Bridge: $ACTIVE_A2J_ENABLE"
 echo "=============================================="
 
 log "JACK Audio System started successfully: Device=$ACTIVE_AUDIO_DEVICE, $ACTIVE_DESC (A2J: $ACTIVE_A2J_ENABLE)"
+
+# =============================================================================
+# PipeWire JACK Tunnel (if PipeWire is running)
+# =============================================================================
+# Restart PipeWire so jackdbus-detect picks up the now-running JACK server.
+# This is needed because at boot PipeWire may start before JACK is ready.
+if command -v pipewire &> /dev/null && pgrep -x pipewire > /dev/null 2>&1; then
+    log_info "Restarting PipeWire to connect JACK tunnel..."
+    systemctl --user restart pipewire.service 2>/dev/null && \
+        log_info "PipeWire restarted - JACK tunnel active" || \
+        log_warn "PipeWire restart failed"
+fi
