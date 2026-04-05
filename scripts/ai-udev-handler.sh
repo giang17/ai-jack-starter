@@ -145,6 +145,13 @@ if [ "$ACTION" = "add" ] && [[ "$KERNEL" == controlC* ]]; then
     fi
 
     if [ "$DEVICE_FOUND" = true ]; then
+        # If JACK is already running, don't restart for a new sound device
+        # (e.g., MIDI controller connecting shouldn't disrupt running audio)
+        if pgrep -x jackdbus > /dev/null 2>&1; then
+            log_info "JACK already running, ignoring new sound device (KERNEL=$KERNEL)"
+            exit 0
+        fi
+
         log_info "Audio interface found, user $USER_LOGGED_IN logged in, starting JACK"
         log_debug "Calling ai-jack-autostart.sh..."
         /usr/local/bin/ai-jack-autostart.sh >> $LOG 2>&1 || log_error "Autostart script failed"
@@ -177,7 +184,13 @@ elif [ "$ACTION" = "remove" ] && [[ "$KERNEL" == card* ]]; then
 
     # Check if ANY external audio device is still available
     if any_external_audio_device_present; then
-        log_info "Another external audio device still available, restarting JACK with new device"
+        # If JACK is still running and the audio interface is still present,
+        # the removed device was not the audio interface (e.g., MIDI controller standby)
+        if pgrep -x jackdbus > /dev/null 2>&1; then
+            log_info "JACK still running and audio interface present - removed device was not the audio interface (KERNEL=$KERNEL)"
+            exit 0
+        fi
+        log_info "Audio interface still available but JACK not running, restarting JACK"
         /usr/local/bin/ai-jack-autostart.sh >> $LOG 2>&1 || log_error "Autostart script failed"
     else
         log_info "No external audio interface remaining, user $USER_LOGGED_IN logged in, stopping JACK"
