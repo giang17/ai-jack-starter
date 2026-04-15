@@ -93,6 +93,33 @@ any_external_audio_device_present() {
 }
 
 # =============================================================================
+# JACK Server Status Check
+# =============================================================================
+
+# Check if JACK server is actually started (not just jackdbus D-Bus daemon idle)
+# jackdbus can be auto-activated by D-Bus and sit idle without a running server.
+# We must use jack_control status to check the real server state.
+jack_server_is_running() {
+    local user="$1"
+    local user_id
+    user_id=$(id -u "$user" 2>/dev/null) || return 1
+    local dbus_socket="/run/user/$user_id/bus"
+
+    if [ -S "$dbus_socket" ]; then
+        local status_output
+        status_output=$(DBUS_SESSION_BUS_ADDRESS="unix:path=$dbus_socket" \
+            runuser -u "$user" -- jack_control status 2>&1) || true
+        log_debug "jack_control status for $user: $status_output"
+        if echo "$status_output" | grep -q "started"; then
+            return 0
+        fi
+    else
+        log_debug "No D-Bus socket for $user at $dbus_socket"
+    fi
+    return 1
+}
+
+# =============================================================================
 # Error Handling
 # =============================================================================
 
@@ -145,10 +172,13 @@ if [ "$ACTION" = "add" ] && [[ "$KERNEL" == controlC* ]]; then
     fi
 
     if [ "$DEVICE_FOUND" = true ]; then
-        # If JACK is already running, don't restart for a new sound device
+        # If JACK server is actually running, don't restart for a new sound device
         # (e.g., MIDI controller connecting shouldn't disrupt running audio)
-        if pgrep -x jackdbus > /dev/null 2>&1; then
-            log_info "JACK already running, ignoring new sound device (KERNEL=$KERNEL)"
+        # NOTE: We check jack_control status instead of pgrep jackdbus, because
+        # jackdbus can be auto-activated by D-Bus and sit idle without a running
+        # JACK server. pgrep would falsely report JACK as "running" in that case.
+        if jack_server_is_running "$USER_LOGGED_IN"; then
+            log_info "JACK server already running, ignoring new sound device (KERNEL=$KERNEL)"
             exit 0
         fi
 
@@ -184,10 +214,10 @@ elif [ "$ACTION" = "remove" ] && [[ "$KERNEL" == card* ]]; then
 
     # Check if ANY external audio device is still available
     if any_external_audio_device_present; then
-        # If JACK is still running and the audio interface is still present,
+        # If JACK server is still running and the audio interface is still present,
         # the removed device was not the audio interface (e.g., MIDI controller standby)
-        if pgrep -x jackdbus > /dev/null 2>&1; then
-            log_info "JACK still running and audio interface present - removed device was not the audio interface (KERNEL=$KERNEL)"
+        if jack_server_is_running "$USER_LOGGED_IN"; then
+            log_info "JACK server still running and audio interface present - removed device was not the audio interface (KERNEL=$KERNEL)"
             exit 0
         fi
         log_info "Audio interface still available but JACK not running, restarting JACK"
