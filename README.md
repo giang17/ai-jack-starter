@@ -10,6 +10,7 @@ Automatic JACK audio server management for USB audio interfaces. Starts and stop
 
 - **Automatic JACK start/stop** when audio interface is connected/disconnected
 - **Hot-plug support** - connect your interface anytime, JACK starts automatically
+- **X11 and Wayland** - active session is detected via logind, not the X11 display
 - **Boot detection** - JACK starts after login if interface is already connected
 - **Device auto-detection** - GUI detects all connected audio devices
 - **Flexible JACK configuration** - customize sample rate, buffer size, and periods
@@ -174,6 +175,7 @@ See [INSTALL.md](INSTALL.md) for:
 - USB Audio Interface (any JACK-compatible device)
 - JACK2 with DBus support (or Pipewire with JACK compatibility)
 - Python 3 + GTK3 (for GUI)
+- systemd with logind — used to detect the active session (works on X11 and Wayland)
 
 ## Migration from motu-m4-jack-starter
 

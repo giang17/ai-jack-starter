@@ -35,6 +35,22 @@ init_logging "login-check" "jack-login-check.log"
 LOG=$(get_log_file)
 log() { log_info "$1"; }
 
+# =============================================================================
+# Session Detection Setup
+# =============================================================================
+# Source session detection library (display-server agnostic: X11 + Wayland)
+if [ -f "$SCRIPT_DIR/ai-jack-session.sh" ]; then
+    source "$SCRIPT_DIR/ai-jack-session.sh"
+elif [ -f "/usr/local/bin/ai-jack-session.sh" ]; then
+    source "/usr/local/bin/ai-jack-session.sh"
+else
+    # Fallback: legacy X11-only detection (finds nothing under Wayland)
+    log_warn "ai-jack-session.sh not found - falling back to X11-only detection"
+    get_active_session_user() { who | grep "(:" | head -n1 | awk '{print $1}'; }
+    get_active_session_display() { echo "${DISPLAY:-:0}"; }
+    get_active_session_type() { echo "unknown"; }
+fi
+
 log_info "Login check: Starting after boot"
 
 # =============================================================================
@@ -69,6 +85,21 @@ any_external_audio_device_present() {
 }
 
 # =============================================================================
+# JACK Server Status Check
+# =============================================================================
+
+# Check whether the JACK server is actually started.
+# jackdbus can be auto-activated by D-Bus and sit idle without a running server,
+# so pgrep would give a false positive - ask jack_control for the real state.
+# We already run in the user's context here, so no runuser/D-Bus juggling needed.
+jack_server_is_running() {
+    local status_output
+    status_output=$(timeout 15 jack_control status 2>&1) || true
+    log_debug "jack_control status: $status_output"
+    echo "$status_output" | grep -q "started"
+}
+
+# =============================================================================
 # Wait for User Login
 # =============================================================================
 
@@ -79,11 +110,11 @@ WAIT_TIME=0
 log_info "Login check: Waiting for user login..."
 
 while [ $WAIT_TIME -lt $MAX_WAIT ]; do
-    # Check for logged-in user with X11 display
-    USER_LOGGED_IN=$(who | grep "(:" | head -n1 | awk '{print $1}')
+    # Check for logged-in user (works for both X11 and Wayland sessions)
+    USER_LOGGED_IN=$(get_active_session_user)
 
     if [ -n "$USER_LOGGED_IN" ]; then
-        log_info "Login check: User $USER_LOGGED_IN logged in after $WAIT_TIME seconds"
+        log_info "Login check: User $USER_LOGGED_IN logged in after $WAIT_TIME seconds (session type: $(get_active_session_type))"
         break
     fi
 
@@ -102,25 +133,31 @@ log_info "Login check: Checking for pre-connected audio interface"
 # Pre-Boot Audio Interface Detection
 # =============================================================================
 
-# Check if trigger file exists (device was detected during boot)
+# The trigger file is written by the udev handler when a device shows up before
+# anyone is logged in. It is a hint, not a precondition: the first login of a boot
+# consumes it, so a second login - e.g. after switching from X11 to Wayland, or
+# any re-login - would never start JACK if we required it. Decide on the actual
+# state instead: interface present and no JACK server running.
 if [ -f /run/ai-jack/device-detected ]; then
-    log_debug "Login check: Device trigger file found, checking hardware"
-
-    # Check for ANY external audio device using auto-detection
-    # This filters out internal devices (HDA Intel, HDMI, etc.)
-    if any_external_audio_device_present; then
-        log_info "Login check: External audio interface detected, starting JACK"
-        # Use user script since we are running as user
-        /usr/local/bin/ai-jack-autostart-user.sh >> $LOG 2>&1
-    else
-        log_warn "Login check: No external audio interface found (internal devices filtered)"
-    fi
-
-    # Remove trigger file
+    log_debug "Login check: Device trigger file found (device connected before login)"
     rm -f /run/ai-jack/device-detected
     log_debug "Login check: Trigger file removed"
 else
-    log_debug "Login check: No device trigger file found"
+    log_debug "Login check: No device trigger file found, checking hardware anyway"
+fi
+
+# Check for ANY external audio device using auto-detection
+# This filters out internal devices (HDA Intel, HDMI, etc.)
+if any_external_audio_device_present; then
+    if jack_server_is_running; then
+        log_info "Login check: External audio interface detected, JACK already running - nothing to do"
+    else
+        log_info "Login check: External audio interface detected, starting JACK"
+        # Use user script since we are running as user
+        /usr/local/bin/ai-jack-autostart-user.sh >> $LOG 2>&1
+    fi
+else
+    log_warn "Login check: No external audio interface found (internal devices filtered)"
 fi
 
 # =============================================================================

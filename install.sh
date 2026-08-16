@@ -29,10 +29,17 @@ check_root() {
     fi
 }
 
+# Session detection library (display-server agnostic: X11 + Wayland)
+if [ -f "$SCRIPT_DIR/scripts/ai-jack-session.sh" ]; then
+    source "$SCRIPT_DIR/scripts/ai-jack-session.sh"
+fi
+
 # Get the actual user (not root)
 get_actual_user() {
     if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
         echo "$SUDO_USER"
+    elif declare -f get_active_session_user >/dev/null 2>&1; then
+        get_active_session_user
     else
         who | grep "(:" | head -n1 | awk '{print $1}'
     fi
@@ -180,6 +187,7 @@ install_scripts() {
 
     local scripts=(
         "ai-jack-logging.sh"
+        "ai-jack-session.sh"
         "ai-udev-handler.sh"
         "ai-jack-autostart.sh"
         "ai-jack-autostart-user.sh"

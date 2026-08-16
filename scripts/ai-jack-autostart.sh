@@ -35,17 +35,32 @@ init_logging "autostart" "jack-autostart.log"
 LOG=$(get_log_file)
 log() { log_info "$1"; }
 
+# =============================================================================
+# Session Detection Setup
+# =============================================================================
+# Source session detection library (display-server agnostic: X11 + Wayland)
+if [ -f "$SCRIPT_DIR/ai-jack-session.sh" ]; then
+    source "$SCRIPT_DIR/ai-jack-session.sh"
+elif [ -f "/usr/local/bin/ai-jack-session.sh" ]; then
+    source "/usr/local/bin/ai-jack-session.sh"
+else
+    # Fallback: legacy X11-only detection (finds nothing under Wayland)
+    log_warn "ai-jack-session.sh not found - falling back to X11-only detection"
+    get_active_session_user() { who | grep "(:" | head -n1 | awk '{print $1}'; }
+    get_active_session_display() { echo "${DISPLAY:-:0}"; }
+    get_active_session_type() { echo "unknown"; }
+    is_user_logged_in() { who | grep -q "^${1:-$USER} "; }
+fi
+
 log_info "Audio Interface detected - Starting JACK directly"
 
 # =============================================================================
 # User Detection
 # =============================================================================
 
-# Dynamic detection of active user and display (flexible X11 session detection)
-ACTIVE_SESSION=$(who | grep "(:" | head -n1)
-ACTIVE_USER=$(echo "$ACTIVE_SESSION" | awk '{print $1}')
-ACTIVE_DISPLAY=$(echo "$ACTIVE_SESSION" | grep -oP '\(:\K[0-9]+' | head -1)
-ACTIVE_DISPLAY=":${ACTIVE_DISPLAY:-0}"
+# Dynamic detection of active user and display (works for X11 and Wayland)
+ACTIVE_USER=$(get_active_session_user)
+ACTIVE_DISPLAY=$(get_active_session_display "$ACTIVE_USER")
 
 # Fallback: If no active user detected, exit script
 if [ -z "$ACTIVE_USER" ]; then
@@ -54,7 +69,7 @@ if [ -z "$ACTIVE_USER" ]; then
 fi
 USER="$ACTIVE_USER"
 
-log_info "Detected active user: $USER (DISPLAY=$ACTIVE_DISPLAY)"
+log_info "Detected active user: $USER (DISPLAY=$ACTIVE_DISPLAY, session type: $(get_active_session_type))"
 
 USER_ID=$(id -u "$USER")
 USER_HOME=$(getent passwd "$USER" | cut -d: -f6)
@@ -69,12 +84,12 @@ fi
 # =============================================================================
 
 # Check if user is fully logged in
-if ! who | grep -q "^$USER "; then
+if ! is_user_logged_in "$USER"; then
     log_info "User $USER not yet logged in. Waiting 30 seconds..."
     sleep 30
 
     # Check again
-    if ! who | grep -q "^$USER "; then
+    if ! is_user_logged_in "$USER"; then
         log_error "User still not logged in after waiting. Aborting."
         exit 1
     fi

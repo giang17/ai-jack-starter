@@ -45,6 +45,21 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 SHUTDOWN_SCRIPT="$SCRIPT_DIR/ai-jack-shutdown.sh"
 INIT_SCRIPT="$SCRIPT_DIR/ai-jack-init.sh"
 
+# =============================================================================
+# Session Detection Setup
+# =============================================================================
+# Source session detection library (display-server agnostic: X11 + Wayland)
+if [ -f "$SCRIPT_DIR_LOGGING/ai-jack-session.sh" ]; then
+    source "$SCRIPT_DIR_LOGGING/ai-jack-session.sh"
+elif [ -f "/usr/local/bin/ai-jack-session.sh" ]; then
+    source "/usr/local/bin/ai-jack-session.sh"
+else
+    # Fallback: legacy X11-only detection (finds nothing under Wayland)
+    log_warn "ai-jack-session.sh not found - falling back to X11-only detection"
+    get_active_session_user() { who | grep "(:" | head -n1 | awk '{print $1}'; }
+    get_active_session_display() { echo "${DISPLAY:-:0}"; }
+fi
+
 echo "=== Audio Interface JACK Server Restart ==="
 log_info "=== Audio Interface JACK Server Restart started ==="
 
@@ -52,11 +67,9 @@ log_info "=== Audio Interface JACK Server Restart started ==="
 # User Detection
 # =============================================================================
 
-# Dynamic detection of active user and display
-ACTIVE_SESSION=$(who | grep "(:" | head -n1)
-ACTIVE_USER=$(echo "$ACTIVE_SESSION" | awk '{print $1}')
-ACTIVE_DISPLAY=$(echo "$ACTIVE_SESSION" | grep -oP '\(:\K[0-9]+' | head -1)
-ACTIVE_DISPLAY=":${ACTIVE_DISPLAY:-0}"
+# Dynamic detection of active user and display (works for X11 and Wayland)
+ACTIVE_USER=$(get_active_session_user)
+ACTIVE_DISPLAY=$(get_active_session_display "$ACTIVE_USER")
 
 # Fallback: If no active user detected, try SUDO_USER
 if [ -z "$ACTIVE_USER" ]; then

@@ -45,6 +45,20 @@ LOG=$(get_log_file)
 export LOG
 
 # =============================================================================
+# Session Detection Setup
+# =============================================================================
+# Source session detection library (display-server agnostic: X11 + Wayland)
+if [ -f "$SCRIPT_DIR/ai-jack-session.sh" ]; then
+    source "$SCRIPT_DIR/ai-jack-session.sh"
+elif [ -f "/usr/local/bin/ai-jack-session.sh" ]; then
+    source "/usr/local/bin/ai-jack-session.sh"
+else
+    # Fallback: legacy X11-only detection (finds nothing under Wayland)
+    log_warn "ai-jack-session.sh not found - falling back to X11-only detection"
+    get_active_session_user() { who | grep "(:" | head -n1 | awk '{print $1}'; }
+fi
+
+# =============================================================================
 # Default Configuration
 # =============================================================================
 DEFAULT_RATE=48000
@@ -84,8 +98,8 @@ if [ -n "$SUDO_USER" ] && [ "$SUDO_USER" != "root" ]; then
 elif [ "$(whoami)" != "root" ]; then
     ACTUAL_USER="$(whoami)"
 else
-    # Fallback: Detect active desktop user
-    ACTUAL_USER=$(who | grep "(:" | head -n1 | awk '{print $1}')
+    # Fallback: Detect active desktop user (works for X11 and Wayland)
+    ACTUAL_USER=$(get_active_session_user)
 fi
 
 if [ -n "$ACTUAL_USER" ] && [ "$ACTUAL_USER" != "root" ]; then

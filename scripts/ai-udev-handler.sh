@@ -51,6 +51,21 @@ init_logging "udev-handler" "jack-udev-handler.log"
 LOG=$(get_log_file)
 
 # =============================================================================
+# Session Detection Setup
+# =============================================================================
+# Source session detection library (display-server agnostic: X11 + Wayland)
+if [ -f "$SCRIPT_DIR/ai-jack-session.sh" ]; then
+    source "$SCRIPT_DIR/ai-jack-session.sh"
+elif [ -f "/usr/local/bin/ai-jack-session.sh" ]; then
+    source "/usr/local/bin/ai-jack-session.sh"
+else
+    # Fallback: legacy X11-only detection (finds nothing under Wayland)
+    log_warn "ai-jack-session.sh not found - falling back to X11-only detection"
+    get_active_session_user() { who | grep "(:" | head -n1 | awk '{print $1}'; }
+    get_active_session_type() { echo "unknown"; }
+fi
+
+# =============================================================================
 # Configuration Loading
 # =============================================================================
 SYSTEM_CONFIG_FILE="/etc/ai-jack/jack-setting.conf"
@@ -140,14 +155,10 @@ log_debug "DEVICE_PATTERN=${DEVICE_PATTERN:-<not set>}"
 if [ "$ACTION" = "add" ] && [[ "$KERNEL" == controlC* ]]; then
     log_info "Sound controller added, checking for audio interface..."
 
-    # Check for logged-in user (flexible X11 session detection)
-    log_debug "Running who command..."
-    WHO_OUTPUT=$(who 2>&1 || echo "who command failed")
-    log_debug "who output: $WHO_OUTPUT"
-
-    # Search for any X11 display session (:0, :1, etc.)
-    USER_LOGGED_IN=$(echo "$WHO_OUTPUT" | grep "(:" | head -n1 | awk '{print $1}' || echo "")
-    log_debug "Found user: [$USER_LOGGED_IN]"
+    # Check for logged-in user (works for both X11 and Wayland sessions)
+    log_debug "Querying logind for active session..."
+    USER_LOGGED_IN=$(get_active_session_user || echo "")
+    log_debug "Found user: [$USER_LOGGED_IN] (session type: $(get_active_session_type))"
 
     if [ -z "$USER_LOGGED_IN" ]; then
         log_info "No user logged in, creating trigger file"
@@ -202,8 +213,8 @@ elif [ "$ACTION" = "remove" ] && [[ "$KERNEL" == card* ]]; then
     # Remove trigger file
     rm -f /run/ai-jack/device-detected 2>/dev/null
 
-    # Check for logged-in user (flexible search)
-    USER_LOGGED_IN=$(who | grep "(:" | head -n1 | awk '{print $1}' || echo "")
+    # Check for logged-in user (works for both X11 and Wayland sessions)
+    USER_LOGGED_IN=$(get_active_session_user || echo "")
 
     if [ -z "$USER_LOGGED_IN" ]; then
         log_info "No user logged in, skipping JACK check"

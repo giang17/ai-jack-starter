@@ -35,6 +35,20 @@ init_logging "autostart-user" "jack-autostart-user.log"
 LOG=$(get_log_file)
 log() { log_info "$1"; }
 
+# =============================================================================
+# Session Detection Setup
+# =============================================================================
+# Source session detection library (display-server agnostic: X11 + Wayland)
+if [ -f "$SCRIPT_DIR/ai-jack-session.sh" ]; then
+    source "$SCRIPT_DIR/ai-jack-session.sh"
+elif [ -f "/usr/local/bin/ai-jack-session.sh" ]; then
+    source "/usr/local/bin/ai-jack-session.sh"
+else
+    # Fallback: legacy X11-only detection (finds nothing under Wayland)
+    log_warn "ai-jack-session.sh not found - falling back to X11-only detection"
+    get_active_session_display() { echo "${DISPLAY:-:0}"; }
+fi
+
 log_info "Audio Interface detected - Starting JACK directly (user context)"
 
 # =============================================================================
@@ -99,9 +113,9 @@ log_info "Starting JACK directly for user: $USER"
 # User Context Execution
 # =============================================================================
 
-# Detect active display from session
-ACTIVE_DISPLAY=$(who | grep "^$(whoami).*(:.*)" | head -n1 | grep -oP '\(:\K[0-9]+' | head -1)
-export DISPLAY=":${ACTIVE_DISPLAY:-0}"
+# Detect active display from session (X11 display or Xwayland under Wayland)
+ACTIVE_DISPLAY=$(get_active_session_display "$USER")
+export DISPLAY="$ACTIVE_DISPLAY"
 log_debug "Detected DISPLAY=$DISPLAY"
 export DBUS_SESSION_BUS_ADDRESS=unix:path=$DBUS_SOCKET
 export XDG_RUNTIME_DIR=/run/user/$USER_ID

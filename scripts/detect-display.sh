@@ -1,10 +1,14 @@
 #!/bin/bash
 
 # =============================================================================
-# MOTU M4 JACK Display Detection Helper
+# Audio Interface JACK Display Detection Helper
 # =============================================================================
-# Automatically detects the active X11 DISPLAY for JACK operations.
-# Can be sourced as a library or run standalone for display analysis.
+# Detects the active DISPLAY for JACK operations and provides a diagnostic
+# view of the current session. Can be sourced as a library or run standalone.
+#
+# The actual detection logic lives in ai-jack-session.sh, which handles X11
+# and Wayland alike. This script keeps the historic CLI (detect/analyze) as a
+# troubleshooting front-end.
 #
 # Copyright (C) 2025
 # License: GPL-3.0-or-later
@@ -13,103 +17,79 @@
 # Color output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
+
+# =============================================================================
+# Session Library
+# =============================================================================
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/ai-jack-session.sh" ]; then
+    source "$SCRIPT_DIR/ai-jack-session.sh"
+elif [ -f "/usr/local/bin/ai-jack-session.sh" ]; then
+    source "/usr/local/bin/ai-jack-session.sh"
+else
+    echo -e "${RED}Error:${NC} ai-jack-session.sh not found - cannot detect session" >&2
+    exit 1
+fi
 
 # =============================================================================
 # Display Detection Function
 # =============================================================================
 
-# Function to detect active X11 DISPLAY
+# Detect the active DISPLAY (X11 display, or Xwayland display under Wayland).
+# Usage: detect_display [username]
 detect_display() {
-    local user="$1"
-    local display=""
-
-    # Method 1: Extract from who command
-    local who_display
-    who_display=$(who | grep "($user)" | grep "(:" | head -n1 | sed 's/.*(\(:[0-9]*\)).*/\1/' | grep -o ':[0-9]*')
-    if [ -n "$who_display" ]; then
-        display="$who_display"
-        echo "$display"
-        return 0
-    fi
-
-    # Method 2: Extract from who command without username filter
-    local who_display_alt
-    who_display_alt=$(who | grep "(:" | head -n1 | sed 's/.*(\(:[0-9]*\)).*/\1/' | grep -o ':[0-9]*')
-    if [ -n "$who_display_alt" ]; then
-        display="$who_display_alt"
-        echo "$display"
-        return 0
-    fi
-
-    # Method 3: Process-based detection
-    if [ -n "$user" ]; then
-        local proc_display
-        proc_display=$(pgrep -u "$user" -f 'Xorg|X11' -a | grep -o -- '-display [^ ]*' | head -n1 | awk '{print $2}')
-        if [ -n "$proc_display" ]; then
-            display="$proc_display"
-            echo "$display"
-            return 0
-        fi
-
-        # Alternative process detection
-        local proc_display_alt
-        proc_display_alt=$(pgrep -u "$user" -f '/usr/lib/xorg/Xorg' -a | grep -o -- ':[0-9]*' | head -n1)
-        if [ -n "$proc_display_alt" ]; then
-            display="$proc_display_alt"
-            echo "$display"
-            return 0
-        fi
-    fi
-
-    # Method 4: Check /tmp/.X11-unix directory
-    if [ -d "/tmp/.X11-unix" ]; then
-        local x11_socket
-        x11_socket=$(find /tmp/.X11-unix/ -maxdepth 1 -name 'X[0-9]*' -printf '%f\n' | head -n1 | sed 's/X//')
-        if [ -n "$x11_socket" ]; then
-            display=":$x11_socket"
-            echo "$display"
-            return 0
-        fi
-    fi
-
-    # Method 5: User's DISPLAY environment variable
-    if [ -n "$user" ]; then
-        local user_display
-        user_display=$(su - "$user" -c "echo \$DISPLAY" 2>/dev/null | grep -o ':[0-9]*')
-        if [ -n "$user_display" ]; then
-            display="$user_display"
-            echo "$display"
-            return 0
-        fi
-    fi
-
-    # Fallback: Standard display
-    echo ":0"
-    return 1
+    get_active_session_display "$1"
 }
 
 # =============================================================================
 # Display Analysis Function
 # =============================================================================
 
-# Function for detailed display analysis
+# Detailed session and display analysis for troubleshooting
 analyze_display() {
     local user="$1"
+    [ -z "$user" ] && user=$(get_active_session_user)
 
-    echo -e "${BLUE}=== Display Analysis for User: ${user:-'current'} ===${NC}"
+    echo -e "${BLUE}=== Session Analysis for User: ${user:-'<none detected>'} ===${NC}"
     echo ""
 
-    echo -e "${BLUE}1. who Command Output:${NC}"
+    echo -e "${BLUE}1. logind Sessions:${NC}"
+    if command -v loginctl >/dev/null 2>&1; then
+        loginctl list-sessions --no-legend 2>/dev/null | while read -r line; do
+            echo "   $line"
+        done
+        echo ""
+        local sid
+        sid=$(get_active_session_id)
+        if [ -n "$sid" ]; then
+            echo -e "${BLUE}   Active graphical session: $sid${NC}"
+            local prop
+            for prop in Name Class Type Display Remote Active State; do
+                echo "     $prop = $(loginctl show-session "$sid" -p "$prop" --value 2>/dev/null)"
+            done
+        else
+            echo -e "${YELLOW}   No active graphical session found${NC}"
+        fi
+    else
+        echo -e "${YELLOW}   loginctl not available${NC}"
+    fi
+    echo ""
+
+    echo -e "${BLUE}2. who Command Output (legacy, X11-only):${NC}"
     who | while read -r line; do
         echo "   $line"
     done
+    if ! who | grep -q "(:"; then
+        echo -e "${YELLOW}   Note: no '(:N)' display entry - expected under Wayland${NC}"
+    fi
     echo ""
 
-    echo -e "${BLUE}2. X11 Sockets in /tmp/.X11-unix:${NC}"
+    echo -e "${BLUE}3. X11 Sockets in /tmp/.X11-unix:${NC}"
     if [ -d "/tmp/.X11-unix" ]; then
-        find /tmp/.X11-unix/ -maxdepth 1 -ls | while read -r line; do
+        find /tmp/.X11-unix/ -maxdepth 1 -ls 2>/dev/null | while read -r line; do
             echo "   $line"
         done
     else
@@ -118,20 +98,18 @@ analyze_display() {
     echo ""
 
     if [ -n "$user" ]; then
-        echo -e "${BLUE}3. X11 Processes for User $user:${NC}"
-        pgrep -u "$user" -f 'Xorg|X11|xinit' -a | while read -r line; do
+        echo -e "${BLUE}4. Desktop Processes for User $user:${NC}"
+        pgrep -u "$user" -f 'Xorg|Xwayland|kwin|plasmashell|gnome-shell' -a 2>/dev/null | while read -r line; do
             echo "   $line"
         done
         echo ""
-
-        echo -e "${BLUE}4. DISPLAY Environment Variable for $user:${NC}"
-        local user_display
-        user_display=$(su - "$user" -c "echo \$DISPLAY" 2>/dev/null)
-        echo "   $user_display"
-        echo ""
     fi
 
-    echo -e "${BLUE}5. Detected DISPLAY:${NC}"
+    echo -e "${BLUE}5. Detected Session Type:${NC}"
+    echo -e "${GREEN}   $(get_active_session_type)${NC}"
+    echo ""
+
+    echo -e "${BLUE}6. Detected DISPLAY:${NC}"
     local detected
     detected=$(detect_display "$user")
     echo -e "${GREEN}   $detected${NC}"
@@ -139,11 +117,12 @@ analyze_display() {
 
     # Test if DISPLAY works
     if [ -n "$user" ] && [ -n "$detected" ]; then
-        echo -e "${BLUE}6. DISPLAY Test:${NC}"
-        if su - "$user" -c "DISPLAY=$detected xdpyinfo >/dev/null 2>&1"; then
-            echo -e "${GREEN}   ✅ DISPLAY $detected is working${NC}"
+        echo -e "${BLUE}7. DISPLAY Test:${NC}"
+        if runuser -u "$user" -- env DISPLAY="$detected" xdpyinfo >/dev/null 2>&1 \
+           || DISPLAY="$detected" xdpyinfo >/dev/null 2>&1; then
+            echo -e "${GREEN}   DISPLAY $detected is working${NC}"
         else
-            echo -e "${RED}   ❌ DISPLAY $detected is not working${NC}"
+            echo -e "${YELLOW}   DISPLAY $detected not reachable (harmless if no X client is needed)${NC}"
         fi
     fi
 }
@@ -160,18 +139,26 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
         "detect")
             detect_display "$2"
             ;;
+        "user")
+            get_active_session_user
+            ;;
+        "type")
+            get_active_session_type
+            ;;
         "help"|"-h"|"--help")
-            echo -e "${BLUE}MOTU M4 JACK Display Detection Helper${NC}"
+            echo -e "${BLUE}Audio Interface JACK Display Detection Helper${NC}"
             echo ""
             echo "Usage:"
             echo "  $0 detect [username]    - Detect DISPLAY for user"
-            echo "  $0 analyze [username]   - Detailed display analysis"
+            echo "  $0 user                 - Print active session user"
+            echo "  $0 type                 - Print session type (wayland/x11/tty)"
+            echo "  $0 analyze [username]   - Detailed session analysis"
             echo "  $0 help                 - Show this help"
             echo ""
             echo "Examples:"
             echo "  $0 detect               # Detect DISPLAY for current active user"
             echo "  $0 detect username      # Detect DISPLAY for user 'username'"
-            echo "  $0 analyze username     # Complete analysis for user 'username'"
+            echo "  $0 analyze              # Complete analysis of the active session"
             echo ""
             echo "As include in other scripts:"
             echo "  source detect-display.sh"
@@ -179,12 +166,7 @@ if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
             ;;
         "")
             # No parameters: detect for current active user
-            active_user=$(who | grep "(:" | head -n1 | awk '{print $1}')
-            if [ -n "$active_user" ]; then
-                detect_display "$active_user"
-            else
-                echo ":0"  # Fallback
-            fi
+            detect_display ""
             ;;
         *)
             echo -e "${RED}Error:${NC} Unknown option '$1'"
