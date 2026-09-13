@@ -6,6 +6,16 @@ For detailed release notes, see [GitHub Releases](https://github.com/giang17/ai-
 
 ## [Unreleased]
 
+### PipeWire
+
+#### Changed
+- **No PipeWire restart after JACK start** - `ai-jack-init.sh` no longer restarts
+  `pipewire.service` once JACK is running. `module-jackdbus-detect` creates the
+  JACK Sink/Source tunnel by itself when the server starts, including the boot
+  order where PipeWire starts first and D-Bus-activates jackdbus. The restart cut
+  every running PipeWire stream on each login, hot-plug and GUI restart. The block
+  stays commented out until a login without it has been confirmed.
+
 ### Wayland Support
 
 #### Fixed
