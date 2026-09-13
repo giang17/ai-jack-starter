@@ -13,8 +13,9 @@ For detailed release notes, see [GitHub Releases](https://github.com/giang17/ai-
   `pipewire.service` once JACK is running. `module-jackdbus-detect` creates the
   JACK Sink/Source tunnel by itself when the server starts, including the boot
   order where PipeWire starts first and D-Bus-activates jackdbus. The restart cut
-  every running PipeWire stream on each login, hot-plug and GUI restart. The block
-  stays commented out until a login without it has been confirmed.
+  every running PipeWire stream on each login, hot-plug and GUI restart. A login
+  without the restart created the tunnel and showed no `jack_control` crash, so the
+  block has been removed.
 
 ### Wayland Support
 

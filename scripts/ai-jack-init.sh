@@ -656,20 +656,8 @@ echo "=============================================="
 log "JACK Audio System started successfully: Device=$ACTIVE_AUDIO_DEVICE, $ACTIVE_DESC (A2J: $ACTIVE_A2J_ENABLE)"
 
 # =============================================================================
-# PipeWire JACK Tunnel (if PipeWire is running)
+# PipeWire JACK Tunnel
 # =============================================================================
-# Disabled: PipeWire's module-jackdbus-detect creates the JACK Sink/Source
-# tunnel on its own when the JACK server starts, so no restart is needed.
-# Tested with PipeWire 1.0.5 / jackdbus 1.9.21: the tunnel appeared ~20 ms
-# after `jack_control start` without a PipeWire restart when (a) the server was
-# stopped and started, (b) jackdbus had exited and was D-Bus-activated again,
-# and (c) PipeWire started first and activated jackdbus itself (boot order).
-# The restart also cut every running PipeWire stream (e.g. a DAW playing
-# through the tunnel) on each login, hot-plug and GUI restart.
-# Kept commented out until a login without it has been confirmed.
-#if command -v pipewire &> /dev/null && pgrep -x pipewire > /dev/null 2>&1; then
-#    log_info "Restarting PipeWire to connect JACK tunnel..."
-#    systemctl --user restart pipewire.service 2>/dev/null && \
-#        log_info "PipeWire restarted - JACK tunnel active" || \
-#        log_warn "PipeWire restart failed"
-#fi
+# No PipeWire restart here: module-jackdbus-detect creates the JACK Sink/Source
+# tunnel by itself as soon as the JACK server starts, also when PipeWire started
+# first. Restarting PipeWire would cut every running PipeWire stream.
