@@ -330,7 +330,15 @@ if [ "$ACTIVE_NPERIODS" -lt 2 ] || [ "$ACTIVE_NPERIODS" -gt 8 ]; then
 fi
 
 # Calculate latency for logging
-LATENCY_MS=$(echo "scale=2; ($ACTIVE_PERIOD * $ACTIVE_NPERIODS) / $ACTIVE_RATE * 1000" | bc)
+# Multiply before dividing: bc truncated (period * nperiods) / rate to its scale
+# before the * 1000, so 2x128 at 48000 Hz was logged as ~0ms and 2x256 as
+# ~10.00ms. Integer tenths of a millisecond, rounded half up.
+if [ "${ACTIVE_RATE:-0}" -gt 0 ] 2>/dev/null; then
+    LATENCY_TENTHS=$(( (ACTIVE_PERIOD * ACTIVE_NPERIODS * 10000 + ACTIVE_RATE / 2) / ACTIVE_RATE ))
+    LATENCY_MS="$((LATENCY_TENTHS / 10)).$((LATENCY_TENTHS % 10))"
+else
+    LATENCY_MS="?"
+fi
 ACTIVE_DESC="Custom (${ACTIVE_RATE}Hz, ${ACTIVE_NPERIODS}x${ACTIVE_PERIOD}, ~${LATENCY_MS}ms)"
 
 # =============================================================================

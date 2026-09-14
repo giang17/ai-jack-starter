@@ -62,7 +62,11 @@ calc_latency() {
     local rate=$1
     local period=$2
     local nperiods=$3
-    echo "scale=1; ($period * $nperiods) / $rate * 1000" | bc
+    # Multiply before dividing: bc truncated (period * nperiods) / rate to its
+    # scale before the * 1000, so 2x256 at 48000 Hz was shown as ~0 ms. Integer
+    # tenths of a millisecond, rounded half up, keep the output locale-independent.
+    local tenths=$(( (period * nperiods * 10000 + rate / 2) / rate ))
+    echo "$((tenths / 10)).$((tenths % 10))"
 }
 
 # Validate sample rate

@@ -18,6 +18,16 @@ For detailed release notes, see [GitHub Releases](https://github.com/giang17/ai-
   a FreeTube stream on the JACK Sink stalled with `spa.mixer-dsp: out of buffers`
   until the application closed it.
 
+#### Fixed
+- **Latency display** - `ai-jack-setting-system.sh`, `ai-jack-setting.sh` and the log
+  line of `ai-jack-init.sh` divided `(period * nperiods) / rate` in `bc` before
+  multiplying by 1000, so the result was truncated to the `bc` scale first: 2x256 at
+  48 kHz was shown as ~0 ms (setting scripts) or ~10.00 ms (log), 2x128 as ~0 ms.
+  As a side effect the "Very low latency" warning fired for every setting below about
+  100 ms, because the truncated value was 0 there. The value
+  is now computed in integer tenths of a millisecond, rounded half up (2x256 at
+  48 kHz: ~10.7 ms, 2x128: ~5.3 ms).
+
 #### Changed
 - **No PipeWire restart after JACK start** - `ai-jack-init.sh` no longer restarts
   `pipewire.service` once JACK is running. `module-jackdbus-detect` creates the
