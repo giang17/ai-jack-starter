@@ -303,6 +303,22 @@ EOF
     # Set permissions (readable for all)
     chmod 644 "$SYSTEM_CONFIG_FILE"
 
+    # Store the same buffer size as PipeWire's quantum. On Ubuntu Studio,
+    # ubuntustudio-pwjack-config writes /etc/profile.d/ubuntustudio-pwjack.sh, and
+    # ubuntustudio-pwconfig-start.service applies that value whenever PipeWire
+    # starts. Without this, a PipeWire restart would force the old quantum again
+    # while JACK runs with the new period. ai-jack-init.sh applies the value at
+    # runtime on every JACK start.
+    local pw_quantum_msg=""
+    if command -v ubuntustudio-pwjack-config &> /dev/null; then
+        if ubuntustudio-pwjack-config "$period" "$rate" > /dev/null 2>&1 && \
+           grep -q "PIPEWIRE_QUANTUM=\"$period/$rate\"" /etc/profile.d/ubuntustudio-pwjack.sh 2>/dev/null; then
+            pw_quantum_msg="${CYAN}PipeWire:${NC}     quantum $period/$rate stored for PipeWire start"
+        else
+            pw_quantum_msg="${YELLOW}Warning:${NC} PipeWire quantum $period/$rate could not be stored"
+        fi
+    fi
+
     echo -e "${GREEN}System-wide configuration saved!${NC}"
     echo ""
     echo -e "${CYAN}Audio Device:${NC}  $audio_device"
@@ -312,6 +328,7 @@ EOF
     echo -e "${CYAN}Periods:${NC}      $nperiods"
     echo -e "${CYAN}Latency:${NC}      ~${latency} ms"
     echo -e "${CYAN}A2J Bridge:${NC}   $a2j_enable"
+    [ -n "$pw_quantum_msg" ] && echo -e "$pw_quantum_msg"
     echo ""
     echo -e "${BLUE}Saved to:${NC} $SYSTEM_CONFIG_FILE"
 

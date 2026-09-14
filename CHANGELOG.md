@@ -8,6 +8,16 @@ For detailed release notes, see [GitHub Releases](https://github.com/giang17/ai-
 
 ### PipeWire
 
+#### Added
+- **PipeWire quantum follows the JACK period** - `ai-jack-init.sh` sets PipeWire's
+  `clock.force-quantum` and `clock.force-rate` to the JACK buffer size and sample
+  rate after every JACK start, without a re-login. `ai-jack-setting-system.sh`
+  stores the same value through `ubuntustudio-pwjack-config` (when installed), so a
+  PipeWire restart keeps it. With PipeWire forced to 256, the JACK tunnel logged
+  0.6 xruns/min at a JACK period of 256, 3.5-6.2/min at 128 and 11.9/min at 32, and
+  a FreeTube stream on the JACK Sink stalled with `spa.mixer-dsp: out of buffers`
+  until the application closed it.
+
 #### Changed
 - **No PipeWire restart after JACK start** - `ai-jack-init.sh` no longer restarts
   `pipewire.service` once JACK is running. `module-jackdbus-detect` creates the

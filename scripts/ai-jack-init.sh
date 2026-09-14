@@ -661,3 +661,20 @@ log "JACK Audio System started successfully: Device=$ACTIVE_AUDIO_DEVICE, $ACTIV
 # No PipeWire restart here: module-jackdbus-detect creates the JACK Sink/Source
 # tunnel by itself as soon as the JACK server starts, also when PipeWire started
 # first. Restarting PipeWire would cut every running PipeWire stream.
+#
+# Keep PipeWire's graph quantum equal to the JACK period. With a forced quantum
+# that differs from the JACK buffer size the tunnel produces xruns (measured with
+# PipeWire forced to 256: 0.6/min at JACK 256, 3.5-6.2/min at 128, 11.9/min at 32),
+# and a stream routed to the JACK Sink can stall ("spa.mixer-dsp: out of buffers")
+# until the application closes it. The metadata change applies immediately and
+# needs no re-login; ai-jack-setting-system.sh stores the same value for the
+# next PipeWire start.
+if command -v pw-metadata &> /dev/null && pgrep -u "$(id -u)" -x pipewire > /dev/null 2>&1; then
+    export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+    if timeout 5 pw-metadata -n settings 0 clock.force-quantum "$ACTIVE_PERIOD" > /dev/null 2>&1 && \
+       timeout 5 pw-metadata -n settings 0 clock.force-rate "$ACTIVE_RATE" > /dev/null 2>&1; then
+        log_info "PipeWire quantum set to $ACTIVE_PERIOD/$ACTIVE_RATE to match JACK"
+    else
+        log_warn "Could not set PipeWire quantum to $ACTIVE_PERIOD/$ACTIVE_RATE"
+    fi
+fi
