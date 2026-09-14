@@ -686,3 +686,22 @@ if command -v pw-metadata &> /dev/null && pgrep -u "$(id -u)" -x pipewire > /dev
         log_warn "Could not set PipeWire quantum to $ACTIVE_PERIOD/$ACTIVE_RATE"
     fi
 fi
+
+# =============================================================================
+# Realtime Audio Optimizer (optional)
+# =============================================================================
+# realtime-audio-optimizer pins the audio servers to dedicated CPUs and raises
+# their real-time threads. JACK creates those threads only when the server
+# starts, so the optimizer's boot-time run cannot reach them. Its re-apply unit
+# runs the optimization again; the polkit rule shipped with the optimizer lets
+# members of the "audio" group start it without a password. --no-block: the
+# unit waits for the PipeWire JACK tunnel before it runs.
+OPTIMIZER_REAPPLY_UNIT="realtime-audio-optimizer-reapply.service"
+if command -v systemctl &> /dev/null && \
+   systemctl cat "$OPTIMIZER_REAPPLY_UNIT" > /dev/null 2>&1; then
+    if timeout 10 systemctl --no-ask-password --no-block start "$OPTIMIZER_REAPPLY_UNIT" > /dev/null 2>&1; then
+        log_info "Realtime Audio Optimizer re-apply started ($OPTIMIZER_REAPPLY_UNIT)"
+    else
+        log_warn "Could not start $OPTIMIZER_REAPPLY_UNIT (polkit rule of the optimizer installed?)"
+    fi
+fi

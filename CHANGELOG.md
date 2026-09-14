@@ -6,6 +6,20 @@ For detailed release notes, see [GitHub Releases](https://github.com/giang17/ai-
 
 ## [Unreleased]
 
+### Realtime Audio Optimizer
+
+#### Added
+- **Re-apply after JACK start** - when
+  [realtime-audio-optimizer](https://github.com/giang17/realtime-audio-optimizer)
+  is installed, `ai-jack-init.sh` starts its `realtime-audio-optimizer-reapply.service`
+  after the JACK server is up. JACK creates its real-time threads only when the
+  server starts, so the optimizer's boot-time run cannot place them: after a boot on
+  14.09.2026 the JACK engine thread and the PipeWire JACK tunnel thread ran on any
+  of CPUs 0-13 instead of the optimizer's audio CPU. Whether the two share a CPU
+  changed the idle JACK DSP load from 9.4 % (different CPUs) to 1.5 % (same CPU)
+  at 128 frames / 48 kHz. The optimizer ships the polkit rule that lets the `audio`
+  group start the unit; without the optimizer nothing happens.
+
 ### PipeWire
 
 #### Added

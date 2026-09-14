@@ -18,6 +18,7 @@ Automatic JACK audio server management for USB audio interfaces. Starts and stop
 - **GTK3 GUI** for easy configuration with live latency calculation
 - **Quick presets** - Low, Medium, and Ultra-Low latency with one click
 - **Passwordless operation** via polkit for audio group members
+- **Works with [realtime-audio-optimizer](https://github.com/giang17/realtime-audio-optimizer)** - if installed, its CPU pinning and real-time priorities are re-applied after every JACK start
 
 ## Supported Audio Interfaces
 
